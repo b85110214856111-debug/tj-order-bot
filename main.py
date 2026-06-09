@@ -30,7 +30,7 @@ scope = [
 ]
 
 import json
-
+from io import BytesIO
 service_account_info = json.loads(
     os.getenv("GOOGLE_CREDENTIALS")
 )
@@ -39,12 +39,60 @@ creds = Credentials.from_service_account_info(
     service_account_info,
     scopes=scope
 )
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+
+drive_service = build(
+    "drive",
+    "v3",
+    credentials=creds
+)
+
 gc = gspread.authorize(creds)
 
 
 sheet = gc.open_by_key(SHEET_ID).sheet1
 customer_sheet = gc.open_by_key(SHEET_ID).worksheet("Customers")
 DELIVERY_LIST = ["自取","自送","代送","業務自送","寄大榮","寄黑貓","寄順豐","寄梓華榮"]
+
+def upload_excel_to_drive(wb):
+
+    file_stream = BytesIO()
+
+    wb.save(file_stream)
+
+    file_stream.seek(0)
+
+    filename = (
+        f"訂單匯出_"
+        f"{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        f".xlsx"
+    )
+
+    media = MediaIoBaseUpload(
+        file_stream,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+    file = drive_service.files().create(
+        body={
+            "name": filename
+        },
+        media_body=media,
+        fields="id"
+    ).execute()
+
+    file_id = file["id"]
+
+    drive_service.permissions().create(
+        fileId=file_id,
+        body={
+            "type": "anyone",
+            "role": "reader"
+        }
+    ).execute()
+
+    return f"https://drive.google.com/file/d/{file_id}/view"
 
 def export_orders(keyword):
 
@@ -99,18 +147,9 @@ def export_orders(keyword):
 
     if count == 0:
         return None
+    return upload_excel_to_drive(wb)
 
-    os.makedirs("exports", exist_ok=True)
 
-    filename = (
-        f"exports/export_"
-        f"{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        f".xlsx"
-    )
-
-    wb.save(filename)
-
-    return filename
 
 
 def get_user_name(user_id):
@@ -826,19 +865,6 @@ def files():
         "files": os.listdir("exports")
     }
 
-@app.get("/download/{filename}")
-def download_file(filename: str):
-
-    filepath = f"exports/{filename}"
-
-    if not os.path.exists(filepath):
-        return {"error": f"{filepath} not found"}
-
-    return FileResponse(
-        filepath,
-        filename=filename,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
 
 @app.post("/callback")
 async def callback(request: Request):
@@ -857,22 +883,19 @@ async def callback(request: Request):
 
         elif text.startswith("匯出"):
 
-            keyword = text.replace("匯出","").strip()
+            keyword = text.replace("匯出", "").strip()
 
             if not keyword:
                 keyword = "全部"
 
-            filename = export_orders(keyword)
+            url = export_orders(keyword)
 
-            if not filename:
-
+            if not url:
                 reply = "❌ 找不到資料"
-
             else:
-
                 reply = (
                     f"✅ Excel匯出完成\n\n"
-                    f"{BASE_URL}/download/{os.path.basename(filename)}"
+                    f"{url}"
                 )
 
         elif text.startswith("刪單"):
