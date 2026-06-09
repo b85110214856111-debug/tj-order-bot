@@ -829,8 +829,13 @@ def files():
 @app.get("/download/{filename}")
 def download_file(filename: str):
 
+    filepath = f"exports/{filename}"
+
+    if not os.path.exists(filepath):
+        return {"error": f"{filepath} not found"}
+
     return FileResponse(
-        path=f"exports/{filename}",
+        filepath,
         filename=filename,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
