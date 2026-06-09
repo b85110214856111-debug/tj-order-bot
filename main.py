@@ -815,6 +815,17 @@ def restore_last_delete():
 
     return f"✅ 已復原最後一次刪除，共 {restored} 筆"
 
+@app.get("/files")
+def files():
+    import os
+
+    if not os.path.exists("exports"):
+        return {"files": []}
+
+    return {
+        "files": os.listdir("exports")
+    }
+
 @app.get("/download/{filename}")
 def download_file(filename: str):
 
