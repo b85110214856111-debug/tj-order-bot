@@ -31,14 +31,12 @@ scope = [
 
 import json
 from io import BytesIO
-service_account_info = json.loads(
-    os.getenv("GOOGLE_CREDENTIALS")
-)
 
-creds = Credentials.from_service_account_info(
-    service_account_info,
+creds = Credentials.from_service_account_file(
+    "service_account.json",
     scopes=scope
 )
+
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 
