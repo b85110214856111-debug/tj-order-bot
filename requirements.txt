@@ -1,0 +1,14 @@
+python-dotenv
+openai
+fastapi
+uvicorn
+line-bot-sdk
+gspread
+google-auth
+python-dotenv
+pillow
+pytesseract
+opencv-python
+numpy
+openpyxl
+google-api-python-client
