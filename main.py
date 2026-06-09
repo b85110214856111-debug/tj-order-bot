@@ -82,7 +82,8 @@ def upload_excel_to_drive(wb):
             ]
         },
         media_body=media,
-        fields="id"
+        fields="id",
+        supportsAllDrives=True
     ).execute()
 
     file_id = file["id"]
@@ -92,7 +93,8 @@ def upload_excel_to_drive(wb):
         body={
             "type": "anyone",
             "role": "reader"
-        }
+        },
+        supportsAllDrives=True
     ).execute()
 
     return f"https://drive.google.com/file/d/{file_id}/view"
