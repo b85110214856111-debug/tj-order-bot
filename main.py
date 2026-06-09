@@ -76,7 +76,10 @@ def upload_excel_to_drive(wb):
 
     file = drive_service.files().create(
         body={
-            "name": filename
+            "name": filename,
+            "parents": [
+                os.getenv("GOOGLE_DRIVE_FOLDER_ID")
+            ]
         },
         media_body=media,
         fields="id"
