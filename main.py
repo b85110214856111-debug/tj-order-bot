@@ -13,7 +13,7 @@ from google.oauth2.service_account import Credentials
 from linebot import LineBotApi
 from linebot.models import TextSendMessage
 load_dotenv()
-
+print(os.getenv("GOOGLE_DRIVE_FOLDER_ID"))
 app = FastAPI()
 BASE_URL = os.getenv(
     "BASE_URL",
@@ -55,6 +55,15 @@ sheet = gc.open_by_key(SHEET_ID).sheet1
 customer_sheet = gc.open_by_key(SHEET_ID).worksheet("Customers")
 DELIVERY_LIST = ["自取","自送","代送","業務自送","寄大榮","寄黑貓","寄順豐","寄梓華榮"]
 
+import cloudinary
+import cloudinary.uploader
+
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET")
+)
+
 def upload_excel_to_drive(wb):
 
     file_stream = BytesIO()
@@ -69,35 +78,14 @@ def upload_excel_to_drive(wb):
         f".xlsx"
     )
 
-    media = MediaIoBaseUpload(
+    result = cloudinary.uploader.upload(
         file_stream,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        resource_type="raw",
+        public_id=filename,
+        overwrite=True
     )
 
-    file = drive_service.files().create(
-        body={
-            "name": filename,
-            "parents": [
-                os.getenv("GOOGLE_DRIVE_FOLDER_ID")
-            ]
-        },
-        media_body=media,
-        fields="id",
-        supportsAllDrives=True
-    ).execute()
-
-    file_id = file["id"]
-
-    drive_service.permissions().create(
-        fileId=file_id,
-        body={
-            "type": "anyone",
-            "role": "reader"
-        },
-        supportsAllDrives=True
-    ).execute()
-
-    return f"https://drive.google.com/file/d/{file_id}/view"
+    return result["secure_url"]
 
 def export_orders(keyword):
 
