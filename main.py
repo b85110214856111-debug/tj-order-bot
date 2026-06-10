@@ -59,7 +59,7 @@ def upload_excel_file(wb):
         resource_type="raw",
         folder="order_exports",
         public_id=filename.replace(".xlsx", ""),
-        overwrite=True
+        overwrite=True,
         use_filename=True
     )
 
