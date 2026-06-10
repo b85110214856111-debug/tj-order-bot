@@ -964,7 +964,7 @@ def restore_order(text):
                     ]]
                 )
 
-            restored += 1
+                restored += 1
 
         return (
         f"✅ 已復原 {restored} 筆訂單"
@@ -1093,7 +1093,10 @@ async def callback(request: Request):
 
         commands = [
             x.strip()
-            for x in text.splitlines()
+            for x in re.split(
+                r"\n\s*\n",
+                text
+            )
             if x.strip()
         ]
 
@@ -1166,6 +1169,14 @@ async def callback(request: Request):
 
                 results.append(
                     restore_order(cmd)
+                )
+
+            elif (
+                "下週" in cmd
+                and "之後每週" in cmd
+            ):
+                results.append(
+                    create_advanced_schedule(cmd)
                 )
 
             elif "每週" in cmd and "到貨" in cmd:
