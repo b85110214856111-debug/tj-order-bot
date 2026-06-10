@@ -60,9 +60,13 @@ def upload_excel_file(wb):
         folder="order_exports",
         public_id=filename.replace(".xlsx", ""),
         overwrite=True
+        use_filename=True
     )
 
-    return result["secure_url"]
+    return (
+    result["secure_url"]
+    + f"?download={filename}"
+    )
 
 import json
 
