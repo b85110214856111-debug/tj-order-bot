@@ -29,8 +29,43 @@ scope = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-import json
+import cloudinary
+import cloudinary.uploader
+
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+    secure=True
+)
+
 from io import BytesIO
+
+def upload_excel_file(wb):
+
+    buffer = BytesIO()
+
+    wb.save(buffer)
+
+    buffer.seek(0)
+
+    filename = (
+        f"orders_"
+        f"{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    )
+
+    result = cloudinary.uploader.upload(
+        buffer,
+        resource_type="raw",
+        folder="order_exports",
+        public_id=filename.replace(".xlsx", ""),
+        overwrite=True
+    )
+
+    return result["secure_url"]
+
+import json
+
 service_account_info = json.loads(
     os.getenv("GOOGLE_CREDENTIALS")
 )
@@ -39,14 +74,7 @@ creds = Credentials.from_service_account_info(
     service_account_info,
     scopes=scope
 )
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
 
-drive_service = build(
-    "drive",
-    "v3",
-    credentials=creds
-)
 
 gc = gspread.authorize(creds)
 
@@ -55,22 +83,6 @@ sheet = gc.open_by_key(SHEET_ID).sheet1
 customer_sheet = gc.open_by_key(SHEET_ID).worksheet("Customers")
 DELIVERY_LIST = ["自取","自送","代送","業務自送","寄大榮","寄黑貓","寄順豐","寄梓華榮"]
 
-def upload_excel_to_drive(wb):
-
-    os.makedirs("exports", exist_ok=True)
-
-    filename = (
-        f"orders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-    )
-
-    filepath = os.path.join(
-        "exports",
-        filename
-    )
-
-    wb.save(filepath)
-
-    return f"{BASE_URL}/download/{filename}"
 
 def export_orders(keyword):
 
@@ -125,7 +137,7 @@ def export_orders(keyword):
 
     if count == 0:
         return None
-    return upload_excel_to_drive(wb)
+    return upload_excel_file(wb)
 
 
 
@@ -831,26 +843,6 @@ def restore_last_delete():
             restored += 1
 
     return f"✅ 已復原最後一次刪除，共 {restored} 筆"
-
-@app.get("/download/{filename}")
-def download_file(filename: str):
-
-    path = os.path.join(
-        "exports",
-        filename
-    )
-
-    if not os.path.exists(path):
-        return PlainTextResponse(
-            "File not found",
-            status_code=404
-        )
-
-    return FileResponse(
-        path,
-        filename=filename,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
 
 @app.get("/files")
 def files():
