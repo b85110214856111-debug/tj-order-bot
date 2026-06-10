@@ -327,69 +327,171 @@ def create_schedule_order(text):
 
 
 
+UNIT_WHITELIST = [
+    "包","袋","箱","件","桶",
+    "公斤","斤","公克",
+    "kg","KG","Kg",
+    "g","G",
+    "lb","LB","lbs"
+]
+
 def edit_order(text):
 
     rows = sheet.get_all_values()
 
-    # 改單 單號 數量 20
-    m = re.match(
-        r"改單\s+(\d+)\s+(日期|商品|數量|單價|配送|備註)\s+(.+)",
-        text
-    )
-
-    if m:
-
-        order_id, field, value = m.groups()
-
-        col_map = {
-            "日期": 3,
-            "商品": 5,
-            "數量": 6,
-            "單價": 8,
-            "配送": 9,
-            "備註": 10
-        }
-
-        for i, r in enumerate(rows[1:], start=2):
-
-            if r[0] == order_id:
-
-                sheet.update_cell(
-                    i,
-                    col_map[field],
-                    value
-                )
-
-                return "✅ 已修改"
-
-        return "❌ 找不到訂單"
-
-    # 改單 6/1 阿振 單價 350
+    text = text.replace("\n", " ").strip()
 
     m = re.match(
-        r"改單\s+(\S+)\s+(\S+)\s+(日期|商品|數量|單價|配送|備註)\s+(.+)",
+        r"改單\s+(.+?)\s+(日期|商品|數量|單價|配送|備註)\s+(.+)",
         text
     )
 
     if not m:
         return "❌ 格式錯誤"
 
-    order_date, customer, field, value = m.groups()
+    target_text = m.group(1).strip()
+    field = m.group(2).strip()
+    value = m.group(3).strip()
 
-    col_map = {
-        "日期": 3,
-        "商品": 5,
-        "數量": 6,
-        "單價": 8,
-        "配送": 9,
-        "備註": 10
-    }
+    dates = re.findall(
+        r"\d{1,2}/\d{1,2}",
+        target_text
+    )
+
+    order_ids = re.findall(
+        r"\d{9,}",
+        target_text
+    )
+
+    customer = ""
+
+    tokens = target_text.split()
+
+    for t in tokens:
+
+        if re.match(r"\d{1,2}/\d{1,2}", t):
+            continue
+
+        if re.match(r"\d{9,}", t):
+            continue
+
+        customer = t
+        break
+
+    qty = None
+    unit = ""
+    note = ""
+
+    if field == "數量":
+
+        qty_match = re.match(
+            r"(\d+(?:\.\d+)?)(.*)",
+            value
+        )
+
+        if not qty_match:
+            return "❌ 數量格式錯誤"
+
+        qty = qty_match.group(1)
+
+        remain = qty_match.group(2).strip()
+
+        if remain:
+
+            first = remain.split()[0]
+
+            if first in UNIT_WHITELIST:
+
+                unit = first
+
+                if len(remain.split()) > 1:
+
+                    note = " ".join(
+                        remain.split()[1:]
+                    )
+
+            else:
+
+                note = remain
 
     updated = 0
 
-    for i, r in enumerate(rows[1:], start=2):
+    col_map = {
+        "日期":3,
+        "商品":5,
+        "數量":6,
+        "單價":8,
+        "配送":9,
+        "備註":10
+    }
 
-        if r[2] == order_date and r[3] == customer:
+    for i, r in enumerate(
+        rows[1:],
+        start=2
+    ):
+
+        status = r[11] if len(r) > 11 else ""
+
+        if status == "已刪除":
+            continue
+
+        match = False
+
+        # 單號模式
+        if order_ids:
+
+            if r[0] in order_ids:
+                match = True
+
+        # 日期模式
+        elif dates:
+
+            if r[2] not in dates:
+                continue
+
+            if customer:
+
+                if r[3] != customer:
+                    continue
+
+            match = True
+
+        if not match:
+            continue
+
+        if field == "數量":
+
+            sheet.update_cell(
+                i,
+                6,
+                qty
+            )
+
+            if unit:
+
+                sheet.update_cell(
+                    i,
+                    7,
+                    unit
+                )
+
+            if note:
+
+                old_note = (
+                    r[9]
+                    if len(r) > 9
+                    else ""
+                )
+
+                sheet.update_cell(
+                    i,
+                    10,
+                    (
+                        old_note + " " + note
+                    ).strip()
+                )
+
+        else:
 
             sheet.update_cell(
                 i,
@@ -397,10 +499,10 @@ def edit_order(text):
                 value
             )
 
-            updated += 1
+        updated += 1
 
     if updated == 0:
-        return "❌ 找不到訂單"
+        return "❌ 找不到符合訂單"
 
     return f"✅ 已修改 {updated} 筆訂單"
 
@@ -464,6 +566,8 @@ def save_order(data, user_id):
 
     oid = generate_order_ids(1)[0]
 
+    seq_no = oid[-3:]
+
     sheet.append_row([
         oid,
         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -480,7 +584,8 @@ def save_order(data, user_id):
         "",
         "",
         "",
-        str(uuid.uuid4())
+        str(uuid.uuid4()),  # P
+        seq_no              # Q
     ])
 
     return oid
@@ -501,6 +606,8 @@ def save_orders_batch(
         orders
     ):
 
+        seq_no = oid[-3:]
+
         rows.append([
             oid,
             datetime.now().strftime(
@@ -519,7 +626,8 @@ def save_orders_batch(
             "",
             "",
             "",
-            str(uuid.uuid4())
+            str(uuid.uuid4()),  # P
+            seq_no              # Q
         ])
 
     sheet.append_rows(rows)
