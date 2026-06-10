@@ -1091,65 +1091,122 @@ async def callback(request: Request):
         user_id = event["source"]["userId"]
         user_name = get_user_name(user_id)
 
-        if text.startswith("查詢"):
-            reply = query_order(text)
+        commands = [
+            x.strip()
+            for x in text.splitlines()
+            if x.strip()
+        ]
 
-        elif text.startswith("匯出"):
+        results = []
 
-            keyword = text.replace("匯出", "").strip()
+        for cmd in commands:
 
-            if not keyword:
-                keyword = "全部"
+            if cmd.startswith("查詢"):
 
-            url = export_orders(keyword)
-
-            if not url:
-                reply = "❌ 找不到資料"
-            else:
-                reply = (
-                    f"✅ Excel匯出完成\n\n"
-                    f"{url}"
+                results.append(
+                    query_order(cmd)
                 )
 
-        elif text.startswith("刪單"):
-            reply = delete_order(text, user_name)
+            elif cmd.startswith("匯出"):
 
-        elif text.startswith("改單"):
-            reply = edit_order(text)
+                keyword = cmd.replace(
+                    "匯出",
+                    ""
+                ).strip()
 
-        elif text.startswith("客戶設定"):
-            reply = customer_setting(text)
+                if not keyword:
+                    keyword = "全部"
 
-        elif text.startswith("客戶 "):
-            reply = customer_query(text)
+                url = export_orders(keyword)
 
-        elif text.startswith("復原"):
-            reply = restore_order(text)
+                if not url:
+                    results.append(
+                        "❌ 找不到資料"
+                    )
+                
+                else:
+                    results.append(
+                        f"✅ Excel匯出完成\n{url}"
+                    )
 
-        elif text.startswith("還原"):
-            reply = restore_order(text)
+            elif cmd.startswith("刪單"):
 
-        elif "每週" in text and "到貨" in text:
-            reply = create_schedule_order(text)
-            
-        else:
-            ids = []
+                results.append(
+                    delete_order(
+                        cmd,
+                        user_name
+                    )   
+                )
 
-            count = 0
-            items = parse_multi_customer_order(text)
-            if items:
+            elif cmd.startswith("改單"):
 
-                count = save_orders_batch(
-                    items,
-                    user_name
-            )
+                results.append(
+                    edit_order(cmd)
+                )
+
+            elif cmd.startswith("客戶設定"):
+
+                results.append(
+                    customer_setting(cmd)
+                )
+
+            elif cmd.startswith("客戶 "):
+
+                results.append(
+                    customer_query(cmd)
+                )
+
+            elif cmd.startswith("復原"):
+
+                results.append(
+                    restore_order(cmd)
+                )
+
+            elif cmd.startswith("還原"):
+
+                results.append(
+                    restore_order(cmd)
+                )
+
+            elif "每週" in cmd and "到貨" in cmd:
+
+                results.append(
+                    create_schedule_order(cmd)
+                )
+
             else:
-                data = parse_order_line(text)
-                if data:
-                    save_order(data, user_name)
-                    count = 1
 
-            reply = f"✅ 已建立 {count} 筆訂單" if count > 0 else "❌ 格式錯誤"
+                count = 0
+
+                items = parse_multi_customer_order(cmd)
+
+                if items:
+
+                    count = save_orders_batch(
+                        items,
+                        user_name
+                    )
+
+                else:
+
+                    data = parse_order_line(cmd)
+
+                    if data:
+
+                        save_order(
+                            data,
+                            user_name
+                        )
+
+                        count = 1
+
+                results.append(
+                    f"✅ 已建立 {count} 筆訂單"
+                    if count > 0
+                    else "❌ 格式錯誤"
+                )
+
+        reply = "\n\n".join(results)
 
         line_bot_api.reply_message(
             event["replyToken"],
