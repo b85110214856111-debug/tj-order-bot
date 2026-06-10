@@ -227,9 +227,154 @@ import calendar
 
 def create_schedule_order(text):
 
+    lines = [
+        x.strip()
+        for x in text.splitlines()
+        if x.strip()
+    ]
+
+    # 三行排程模式
+    if len(lines) >= 3:
+
+        customer = lines[0]
+
+        rows = customer_sheet.get_all_values()
+
+        customer_data = None
+
+        for r in rows[1:]:
+
+            if r[0] == customer:
+                customer_data = r
+                break
+
+        if not customer_data:
+            return "❌ 客戶未設定"
+
+        weekday_map = {
+            "一":0,
+            "二":1,
+            "三":2,
+            "四":3,
+            "五":4,
+            "六":5,
+            "日":6
+        }
+
+        product = customer_data[1]
+
+        qty_match = re.search(
+            r"(\d+(?:\.\d+)?)",
+            customer_data[2]
+        )
+
+        qty = float(qty_match.group(1))
+
+        unit = parse_unit(
+            customer_data[2]
+        )
+
+        price = float(customer_data[3])
+
+        today = datetime.now().date()
+
+        orders = []
+
+        # 下週四、五到貨
+
+        m = re.search(
+            r"下週([一二三四五六日、]+)",
+            lines[1]
+        )
+
+        if m:
+
+            target_days = [
+                weekday_map[x]
+                for x in re.findall(
+                    r"[一二三四五六日]",
+                    m.group(1)
+                )
+            ]
+
+            next_week_start = today + timedelta(days=7)
+
+            for i in range(7):
+
+                d = next_week_start + timedelta(days=i)
+
+                if d.weekday() in target_days:
+
+                    orders.append({
+                        "date": f"{d.month}/{d.day}",
+                        "customer": customer,
+                        "product": product,
+                        "qty": qty,
+                        "unit": unit,
+                        "price": price,
+                        "delivery": "",
+                        "note": "特殊排程"
+                    })
+
+        # 之後每週二三四五到月底
+
+        m = re.search(
+            r"之後每週([一二三四五六日]+)",
+            lines[2]
+        )
+
+        if m:
+
+            target_days = [
+                weekday_map[x]
+                for x in m.group(1)
+            ]
+
+            start = today + timedelta(days=14)
+
+            last_day = calendar.monthrange(
+                today.year,
+                today.month
+            )[1]
+
+            end_date = today.replace(
+                day=last_day
+            )
+
+            current = start
+
+            while current <= end_date:
+
+                if current.weekday() in target_days:
+
+                    orders.append({
+                        "date": f"{current.month}/{current.day}",
+                        "customer": customer,
+                        "product": product,
+                        "qty": qty,
+                        "unit": unit,
+                        "price": price,
+                        "delivery": "",
+                        "note": "固定排程"
+                    })
+
+                current += timedelta(days=1)
+
+        if not orders:
+            return "❌ 沒有符合日期"
+
+        count = save_orders_batch(
+            orders,
+            "SYSTEM"
+        )
+
+        return f"✅ 已建立 {count} 筆排程訂單"
+
     text = text.strip()
 
     start_next_week = False
+
+    
 
     if "下週開始" in text:
         start_next_week = True
@@ -325,6 +470,7 @@ def create_schedule_order(text):
 
     return f"✅ 已建立 {count} 筆固定排程訂單"
 
+    
 
 
 UNIT_WHITELIST = [
@@ -1090,6 +1236,21 @@ async def callback(request: Request):
         text = event["message"]["text"]
         user_id = event["source"]["userId"]
         user_name = get_user_name(user_id)
+        
+        if (
+            "\n" in text
+            and "下週" in text
+            and "之後每週" in text
+        ):
+
+            reply = create_schedule_order(text)
+
+            line_bot_api.reply_message(
+                event["replyToken"],
+                TextSendMessage(text=reply)
+            )
+
+            continue
 
         commands = [
             x.strip()
