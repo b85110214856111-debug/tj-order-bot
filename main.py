@@ -70,7 +70,7 @@ def upload_excel_file(wb):
             public_id=filename.replace(
                 ".xlsx",
                 ""
-            )
+            ),
             overwrite=True
         )
 
