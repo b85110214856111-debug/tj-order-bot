@@ -31,6 +31,7 @@ scope = [
 
 import cloudinary
 import cloudinary.uploader
+import tempfile
 
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
@@ -43,32 +44,26 @@ from io import BytesIO
 
 def upload_excel_file(wb):
 
-    buffer = BytesIO()
-
-    wb.save(buffer)
-
-    buffer.seek(0)
-
     filename = (
-        f"orders_"
-        f"{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        f"orders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     )
 
-    result = cloudinary.uploader.upload(
-        buffer,
-        resource_type="raw",
-        folder="order_exports",
-        public_id=filename.replace(".xlsx", ""),
-        overwrite=True,
-        use_filename=True
-    )
+    with tempfile.NamedTemporaryFile(
+        suffix=".xlsx",
+        delete=False
+    ) as tmp:
 
-    url = result["secure_url"]
+        wb.save(tmp.name)
 
-    return (
-        "✅ Excel匯出完成\n\n"
-        f"{url}?download=orders.xlsx"
-    )
+        result = cloudinary.uploader.upload(
+            tmp.name,
+            resource_type="raw",
+            folder="order_exports",
+            public_id=filename,
+            overwrite=True
+        )
+
+    return result["secure_url"]
 
 import json
 
