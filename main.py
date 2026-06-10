@@ -40,6 +40,8 @@ cloudinary.config(
     secure=True
 )
 
+import uuid
+
 from io import BytesIO
 
 def upload_excel_file(wb):
@@ -65,7 +67,10 @@ def upload_excel_file(wb):
             tmp_path,
             resource_type="raw",
             folder="order_exports",
-            public_id=filename,
+            public_id=filename.replace(
+                ".xlsx",
+                ""
+            )
             overwrite=True
         )
 
@@ -93,6 +98,7 @@ gc = gspread.authorize(creds)
 
 sheet = gc.open_by_key(SHEET_ID).sheet1
 customer_sheet = gc.open_by_key(SHEET_ID).worksheet("Customers")
+settings_sheet = gc.open_by_key(SHEET_ID).worksheet("Settings")
 DELIVERY_LIST = ["自取","自送","代送","業務自送","寄大榮","寄黑貓","寄順豐","寄梓華榮"]
 
 
@@ -288,14 +294,15 @@ def create_schedule_order(text):
 
     end_date = today.replace(day=last_day)
 
-    count = 0
+    orders = []
+
     current = today
 
     while current <= end_date:
 
         if current.weekday() in target_days:
 
-            order = {
+            orders.append({
                 "date": f"{current.month}/{current.day}",
                 "customer": customer,
                 "product": product,
@@ -304,12 +311,17 @@ def create_schedule_order(text):
                 "price": price,
                 "delivery": "",
                 "note": "固定排程"
-            }
-
-            save_order(order, "SYSTEM")
-            count += 1
+            })
 
         current += timedelta(days=1)
+
+    if not orders:
+        return "❌ 沒有符合日期"
+
+    count = save_orders_batch(
+        orders,
+        "SYSTEM"
+    )
 
     return f"✅ 已建立 {count} 筆固定排程訂單"
 
@@ -402,37 +414,108 @@ def detect_delivery(text):
             return d
     return ""
 
-def generate_order_id():
+def generate_order_ids(count):
+
     today = datetime.now()
-    prefix = f"{today.year-1911}{today.strftime('%m%d')}"
-    seq = 0
-    for r in sheet.get_all_values()[1:]:
-        if r and r[0].startswith(prefix):
-            try:
-                seq = max(seq, int(r[0][-3:]))
-            except:
-                pass
-    return f"{prefix}{str(seq+1).zfill(3)}"
+
+    prefix = (
+        f"{today.year-1911}"
+        f"{today.strftime('%m%d')}"
+    )
+
+    rows = sheet.get_all_values()
+
+    today_ids = []
+
+    for r in rows[1:]:
+
+        if len(r) == 0:
+            continue
+
+        oid = r[0]
+
+        if oid.startswith(prefix):
+            today_ids.append(oid)
+
+    seq = len(today_ids) + 1
+
+    ids = []
+
+    for i in range(count):
+
+        ids.append(
+            f"{prefix}"
+            f"{str(seq+i).zfill(3)}"
+        )
+
+    return ids
+
+
+def generate_order_id():
+    return generate_order_ids(1)[0]
 
 def save_order(data, user_id):
     oid = generate_order_id()
     sheet.append_row([
-    oid,
-    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    data["date"],
-    data["customer"],
-    data["product"],
-    data["qty"],
-    data["unit"],
-    data["price"],
-    data["delivery"],
-    data["note"],
-    user_id,
-    "正常",
-    "",
-    ""
+        oid,
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        data["date"],
+        data["customer"],
+        data["product"],
+        data["qty"],
+        data["unit"],
+        data["price"],
+        data["delivery"],
+        data["note"],
+        user_id,
+        "正常",
+        "",
+        "",
+        "",
+        str(uuid.uuid4())      # P欄
 ])
     return oid
+
+def save_orders_batch(
+    orders,
+    user_id
+):
+
+    rows = []
+
+    order_ids = generate_order_ids(
+        len(orders)
+    )
+
+    for oid, order in zip(
+        order_ids,
+        orders
+    ):
+
+        rows.append([
+            oid,
+            datetime.now().strftime(
+            "%Y-%m-%d %H:%M:%S"
+            ),
+            order["date"],
+            order["customer"],
+            order["product"],
+            order["qty"],
+            order["unit"],
+            order["price"],
+            order["delivery"],
+            order["note"],
+            user_id,
+            "正常",
+            "",
+            "",
+            "",
+            str(uuid.uuid4())
+        ])
+
+    sheet.append_rows(rows)
+
+    return len(rows)
 
 def parse_order_line(line):
     parts = line.split()
@@ -490,7 +573,7 @@ def parse_multi_customer_order(text):
             continue
 
         m = re.match(
-            r"^(\d{1,2}/\d{1,2})\s+(.+)$",
+            r"^(\d{1,2}/\d{1,2})(?:\s+(.+))?$",
             line
         )
 
@@ -924,16 +1007,21 @@ async def callback(request: Request):
         else:
             ids = []
 
+            count = 0
             items = parse_multi_customer_order(text)
             if items:
-                for item in items:
-                    ids.append(save_order(item, user_name))
+
+                count = save_orders_batch(
+                    items,
+                    user_name
+            )
             else:
                 data = parse_order_line(text)
                 if data:
-                    ids.append(save_order(data, user_name))
+                    save_order(data, user_name)
+                    count = 1
 
-            reply = f"✅ 已建立 {len(ids)} 筆訂單" if ids else "❌ 格式錯誤"
+            reply = f"✅ 已建立 {count} 筆訂單" if count > 0 else "❌ 格式錯誤"
 
         line_bot_api.reply_message(
             event["replyToken"],
