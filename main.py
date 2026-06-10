@@ -48,22 +48,33 @@ def upload_excel_file(wb):
         f"orders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     )
 
-    with tempfile.NamedTemporaryFile(
-        suffix=".xlsx",
-        delete=False
-    ) as tmp:
+    tmp_path = None
 
-        wb.save(tmp.name)
+    try:
+
+        with tempfile.NamedTemporaryFile(
+            suffix=".xlsx",
+            delete=False
+        ) as tmp:
+
+            tmp_path = tmp.name
+
+        wb.save(tmp_path)
 
         result = cloudinary.uploader.upload(
-            tmp.name,
+            tmp_path,
             resource_type="raw",
             folder="order_exports",
             public_id=filename,
             overwrite=True
         )
 
-    return result["secure_url"]
+        return result["secure_url"]
+
+    finally:
+
+        if tmp_path and os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
 import json
 
