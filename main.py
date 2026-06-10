@@ -418,34 +418,40 @@ def generate_order_ids(count):
 
     today = datetime.now()
 
-    prefix = (
-        f"{today.year-1911}"
+    roc_date = (
+        f"{today.year - 1911}"
         f"{today.strftime('%m%d')}"
     )
 
-    rows = sheet.get_all_values()
+    last_date = settings_sheet.acell("B1").value
+    last_seq = int(
+        settings_sheet.acell("B2").value or "0"
+    )
 
-    today_ids = []
+    # 換日歸零
+    if last_date != roc_date:
+        last_seq = 0
 
-    for r in rows[1:]:
+    start_seq = last_seq + 1
 
-        if len(r) == 0:
-            continue
-
-        oid = r[0]
-
-        if oid.startswith(prefix):
-            today_ids.append(oid)
-
-    seq = len(today_ids) + 1
+    # 寫回最新狀態
+    settings_sheet.update(
+        "B1:B2",
+        [
+            [roc_date],
+            [str(last_seq + count)]
+        ]
+    )
 
     ids = []
 
     for i in range(count):
 
+        seq = start_seq + i
+
         ids.append(
-            f"{prefix}"
-            f"{str(seq+i).zfill(3)}"
+            f"{roc_date}"
+            f"{str(seq).zfill(3)}"
         )
 
     return ids
@@ -455,7 +461,9 @@ def generate_order_id():
     return generate_order_ids(1)[0]
 
 def save_order(data, user_id):
-    oid = generate_order_id()
+
+    oid = generate_order_ids(1)[0]
+
     sheet.append_row([
         oid,
         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -472,8 +480,9 @@ def save_order(data, user_id):
         "",
         "",
         "",
-        str(uuid.uuid4())      # P欄
-])
+        str(uuid.uuid4())
+    ])
+
     return oid
 
 def save_orders_batch(
@@ -495,7 +504,7 @@ def save_orders_batch(
         rows.append([
             oid,
             datetime.now().strftime(
-            "%Y-%m-%d %H:%M:%S"
+                "%Y-%m-%d %H:%M:%S"
             ),
             order["date"],
             order["customer"],
