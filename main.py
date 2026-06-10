@@ -846,7 +846,7 @@ def delete_order(text, user_id):
 # 日期 + 客戶
 
     target_date = dates[0]
-    target_customer = customers[0] if customers else ""
+    target_customer = customers[0]
 
     for i in range(len(rows), 1, -1):
 
@@ -861,15 +861,17 @@ def delete_order(text, user_id):
         sheet_customer = r[3].strip()
 
         if (
-            target_date in sheet_date
-            and target_customer == sheet_customer
+            sheet_date in dates
+            and sheet_customer == target_customer
         ):
 
             sheet.update(
                 f"L{i}:O{i}",
                 [[
                     "已刪除",
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    datetime.now().strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    ),
                     user_id,
                     delete_batch
                 ]]
@@ -937,9 +939,13 @@ def restore_order(text):
         return "❌ 僅支援：復原 單號、復原 日期、復原 日期 客戶"
 
     # 日期
+   # 日期
+
     if dates and not customers:
 
-        for i, r in enumerate(rows[1:], start=2):
+        for i in range(len(rows), 1, -1):
+
+            r = rows[i - 1]
 
             status = r[11] if len(r) > 11 else ""
 
@@ -956,18 +962,20 @@ def restore_order(text):
                         "",
                         ""
                     ]]
-)
+                )
 
-                restored += 1
+            restored += 1
 
         return (
-            f"✅ 已復原 {restored} 筆訂單"
-            if restored
-            else "❌ 找不到已刪除訂單"
+        f"✅ 已復原 {restored} 筆訂單"
+        if restored
+        else "❌ 找不到已刪除訂單"
         )
 
+    
+    
     # 日期 + 客戶
-    target_date = dates[0]
+
     target_customer = customers[0]
 
     for i, r in enumerate(rows[1:], start=2):
@@ -977,9 +985,12 @@ def restore_order(text):
         if status != "已刪除":
             continue
 
+        sheet_date = r[2].strip()
+        sheet_customer = r[3].strip()
+
         if (
-            r[2] == target_date
-            and r[3] == target_customer
+            sheet_date in dates
+            and sheet_customer == target_customer
         ):
 
             sheet.update(
