@@ -63,9 +63,11 @@ def upload_excel_file(wb):
         use_filename=True
     )
 
+    url = result["secure_url"]
+
     return (
-    result["secure_url"]
-    + f"?download={filename}"
+        "✅ Excel匯出完成\n\n"
+        f"{url}?download=orders.xlsx"
     )
 
 import json
