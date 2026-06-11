@@ -206,6 +206,140 @@ def parse_order_image(image_bytes):
 
         return []
 
+
+def parse_purchase_order_image(image_bytes):
+
+    import json
+    import base64
+
+    image_base64 = base64.b64encode(
+        image_bytes
+    ).decode()
+
+    response = client.chat.completions.create(
+        model="gpt-4.1",
+        messages=[
+            {
+                "role":"user",
+                "content":[
+                    {
+                        "type":"text",
+                        "text":"""
+這是一張採購單。
+
+請辨識表格資料。
+
+採購公司通常為：
+佳佳農產品實業有限公司
+
+請擷取：
+
+交貨日期 -> date
+品名 -> product
+數量 -> qty
+單位 -> unit
+單價 -> price
+備註 -> note
+
+customer固定填：
+
+佳佳農產品實業有限公司
+
+delivery固定空白
+
+輸出格式：
+
+[
+ {
+   "date":"",
+   "customer":"",
+   "product":"",
+   "qty":0,
+   "unit":"",
+   "price":0,
+   "delivery":"",
+   "note":""
+ }
+]
+
+規則：
+
+1. 每個交貨日期算一筆
+2. 保留完整商品名稱
+3. qty只能輸出數字
+4. price只能輸出數字
+5. note保留完整內容
+6. 只輸出JSON
+7. 禁止markdown
+8. 禁止任何說明文字
+"""
+                    },
+                    {
+                        "type":"image_url",
+                        "image_url":{
+                            "url":
+                            f"data:image/jpeg;base64,{image_base64}"
+                        }
+                    }
+                ]
+            }
+        ]
+    )
+
+    content = (
+        response
+        .choices[0]
+        .message
+        .content
+        .strip()
+    )
+
+    print(content)
+
+    try:
+        return json.loads(content)
+
+    except Exception as e:
+
+        print("JSON解析失敗")
+        print(content)
+
+        return []
+    
+def detect_purchase_order(image_bytes):
+
+    image_base64 = base64.b64encode(
+        image_bytes
+    ).decode()
+
+    response = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=[
+            {
+                "role":"user",
+                "content":[
+                    {
+                        "type":"text",
+                        "text":"這是不是採購單？只回答 YES 或 NO"
+                    },
+                    {
+                        "type":"image_url",
+                        "image_url":{
+                            "url":
+                            f"data:image/jpeg;base64,{image_base64}"
+                        }
+                    }
+                ]
+            }
+        ]
+    )
+
+    return (
+        "YES"
+        in response.choices[0]
+        .message.content.upper()
+    )
+
 def format_orders(orders):
 
     lines = []
@@ -1473,6 +1607,25 @@ def restore_last_delete():
 
     return f"✅ 已復原最後一次刪除，共 {restored} 筆"
 
+def ai_correct(text):
+
+    rows = ai_sheet.get_all_values()
+
+    for r in rows[1:]:
+
+        if len(r) < 2:
+            continue
+
+        wrong = r[0]
+        correct = r[1]
+
+        text = text.replace(
+            wrong,
+            correct
+        )
+
+    return text
+
 @app.get("/files")
 def files():
     import os
@@ -1511,9 +1664,19 @@ async def callback(request: Request):
 
                 image_data.write(chunk)
 
-            orders = parse_order_image(
-                image_data.getvalue()
-            )
+            img = image_data.getvalue()
+
+            if detect_purchase_order(img):
+
+                orders = parse_purchase_order_image(
+                    img
+                )
+
+            else:
+
+                orders = parse_order_image(
+                    img
+                )
 
             pending_orders[user_id] = orders
 
