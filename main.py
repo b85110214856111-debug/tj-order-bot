@@ -3,6 +3,7 @@
 import os
 import re
 from datetime import datetime
+from tracemalloc import start
 from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse
 from dotenv import load_dotenv
@@ -332,14 +333,19 @@ def create_schedule_order(text):
 
             start = today + timedelta(days=14)
 
+            target_year = start.year
+            target_month = start.month
+
             last_day = calendar.monthrange(
-                today.year,
-                today.month
+                target_year,
+                target_month
             )[1]
 
-            end_date = today.replace(
-                day=last_day
-            )
+            end_date = datetime(
+                target_year,
+                target_month,
+                last_day
+            ).date()
 
             current = start
 
@@ -653,8 +659,16 @@ def edit_order(text):
     return f"✅ 已修改 {updated} 筆訂單"
 
 def parse_unit(text):
-    m = re.search(r"[a-zA-Z\u4e00-\u9fa5]+", text)
-    return m.group(0) if m else "件"
+
+    m = re.search(
+        r"\d+(?:\.\d+)?([a-zA-Z\u4e00-\u9fa5]+)",
+        text
+    )
+
+    if m:
+        return m.group(1)
+
+    return "件"
 
 def detect_delivery(text):
     for d in DELIVERY_LIST:
@@ -1337,7 +1351,7 @@ async def callback(request: Request):
                 and "之後每週" in cmd
             ):
                 results.append(
-                    create_advanced_schedule(cmd)
+                    create_schedule_order(cmd)
                 )
 
             elif "每週" in cmd and "到貨" in cmd:
