@@ -186,13 +186,25 @@ def parse_order_image(image_bytes):
         ]
     )
 
-    content = response.choices[0].message.content
+    content = (
+        response.choices[0]
+        .message.content
+        .strip()
+    )
 
     print("========== GPT ==========")
-    print(repr(content))
+    print(content)
     print("=========================")
 
-    return []
+    try:
+
+        return json.loads(content)
+
+    except Exception as e:
+
+        print("JSON解析失敗:", e)
+
+        return []
 
 def format_orders(orders):
 
@@ -1505,13 +1517,31 @@ async def callback(request: Request):
 
             pending_orders[user_id] = orders
 
+            preview = []
+
+            for i, o in enumerate(
+                orders,
+                start=1
+            ):
+
+                preview.append(
+                    f"{i}."
+                    f"\n日期:{o['date']}"
+                    f"\n客戶:{o['customer']}"
+                    f"\n商品:{o['product']}"
+                    f"\n數量:{o['qty']}{o['unit']}"
+                    f"\n單價:{o['price']}"
+                    f"\n配送:{o['delivery']}"
+                    f"\n備註:{o['note']}"
+                )
+
             line_bot_api.reply_message(
                 event["replyToken"],
                 TextSendMessage(
                     text=
                     "📋 AI辨識完成\n\n"
-                    + format_orders(orders)
-                    + "\n\n可輸入：\n修改\n確認\n取消"
+                    + "\n\n".join(preview)
+                    + "\n\n可輸入：\n修改 1 商品 高麗菜\n確認\n取消"
                 )
             )
 
