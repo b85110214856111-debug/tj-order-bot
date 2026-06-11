@@ -155,6 +155,8 @@ def export_orders(keyword):
 
     count = 0
 
+    summary = {}
+
     for r in rows[1:]:
 
         status = r[11] if len(r) > 11 else ""
@@ -180,10 +182,44 @@ def export_orders(keyword):
             r[9]
         ])
 
+        customer = r[3]
+        product = r[4]
+
+        try:
+            qty = float(r[5])
+        except:
+            qty = 0
+
+        key = (customer, product)
+
+        summary[key] = (
+            summary.get(key, 0) + qty
+        )
+
         count += 1
 
     if count == 0:
         return None
+    # =====================
+    # 統計表
+    # =====================
+
+    ws.append([])
+    ws.append([])
+    ws.append(["統計表"])
+    ws.append([
+        "客戶",
+        "商品",
+        "數量合計"
+    ])
+
+    for (customer, product), total_qty in sorted(summary.items()):
+
+        ws.append([
+            customer,
+            product,
+            total_qty
+        ])
     return upload_excel_file(wb)
 
 
