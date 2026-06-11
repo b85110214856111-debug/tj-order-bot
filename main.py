@@ -184,17 +184,20 @@ def export_orders(keyword):
 
         customer = r[3]
         product = r[4]
+        unit = r[6]
 
         try:
             qty = float(r[5])
         except:
             qty = 0
 
-        key = (customer, product)
-
-        summary[key] = (
-            summary.get(key, 0) + qty
+        key = (
+            customer,
+            product,
+            unit
         )
+
+        summary[key] = summary.get(key, 0) + qty
 
         count += 1
 
@@ -207,17 +210,20 @@ def export_orders(keyword):
     ws.append([])
     ws.append([])
     ws.append(["統計表"])
+
     ws.append([
         "客戶",
         "商品",
+        "單位",
         "數量合計"
     ])
 
-    for (customer, product), total_qty in sorted(summary.items()):
+    for (customer, product, unit), total_qty in sorted(summary.items()):
 
         ws.append([
             customer,
             product,
+            unit,
             total_qty
         ])
     return upload_excel_file(wb)
