@@ -1286,10 +1286,36 @@ async def callback(request: Request):
     body = await request.json()
 
     for event in body["events"]:
+
         if event["type"] != "message":
             continue
 
         text = event["message"]["text"]
+
+    # ===== 移除 LINE Mention =====
+
+        mentionees = []
+
+        if "mention" in event["message"]:
+            mentionees = event["message"]["mention"].get(
+                "mentionees",
+                []
+            )
+
+        for m in reversed(mentionees):
+
+            start = m["index"]
+            length = m["length"]
+
+            text = (
+                text[:start]
+                + text[start + length:]
+            )
+
+        text = text.strip()
+
+    # ============================
+
         user_id = event["source"]["userId"]
         user_name = get_user_name(user_id)
         
