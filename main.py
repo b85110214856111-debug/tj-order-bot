@@ -550,21 +550,25 @@ def edit_order(text):
 
         if remain:
 
-            first = remain.split()[0]
+            m = re.match(
+                r"([^\d\s]+)(.*)",
+                remain
+            )
 
-            if first in UNIT_WHITELIST:
+            if m:
 
-                unit = first
+                possible_unit = m.group(1)
 
-                if len(remain.split()) > 1:
+                remain_note = m.group(2).strip()
 
-                    note = " ".join(
-                        remain.split()[1:]
-                    )
+                if possible_unit in UNIT_WHITELIST:
 
-            else:
+                    unit = possible_unit
+                    note = remain_note
 
-                note = remain
+                else:
+
+                    note = remain
 
     updated = 0
 
