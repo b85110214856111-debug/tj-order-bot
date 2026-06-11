@@ -633,18 +633,10 @@ def edit_order(text):
 
             if note:
 
-                old_note = (
-                    r[9]
-                    if len(r) > 9
-                    else ""
-                )
-
                 sheet.update_cell(
                     i,
                     10,
-                    (
-                        old_note + " " + note
-                    ).strip()
+                    note
                 )
 
         else:
