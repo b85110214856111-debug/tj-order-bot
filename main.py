@@ -872,11 +872,32 @@ def parse_multi_customer_order(text):
 
         qty = float(m.group(2))
 
-        unit = m.group(3) or "件"
+        unit_text = m.group(3) or ""
+
+        unit = "件"
+        remain_unit_note = unit_text
+
+        for u in sorted(
+            UNIT_WHITELIST,
+            key=len,
+            reverse=True
+        ):
+            if remain_unit_note.startswith(u):
+
+                unit = u
+
+                remain_unit_note = (
+                    remain_unit_note[len(u):]
+                    .strip()
+                )
+
+                break
 
         price = float(m.group(4)) if m.group(4) else 0
 
-        remain = m.group(5).strip()
+        remain = (
+            remain_unit_note + " " + m.group(5)
+        ).strip()
 
         delivery = detect_delivery(remain)
 
