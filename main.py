@@ -550,25 +550,22 @@ def edit_order(text):
 
         if remain:
 
-            m = re.match(
-                r"([^\d\s]+)(.*)",
-                remain
-            )
+            for u in sorted(
+                UNIT_WHITELIST,
+                key=len,
+                reverse=True
+            ):
 
-            if m:
+                if remain.startswith(u):
 
-                possible_unit = m.group(1)
+                    unit = u
+                    note = remain[len(u):].strip()
 
-                remain_note = m.group(2).strip()
+                    break
 
-                if possible_unit in UNIT_WHITELIST:
+            if not unit:
 
-                    unit = possible_unit
-                    note = remain_note
-
-                else:
-
-                    note = remain
+                note = remain
 
     updated = 0
 
@@ -656,13 +653,13 @@ def edit_order(text):
 
 def parse_unit(text):
 
-    m = re.search(
-        r"\d+(?:\.\d+)?([a-zA-Z\u4e00-\u9fa5]+)",
-        text
-    )
-
-    if m:
-        return m.group(1)
+    for u in sorted(
+        UNIT_WHITELIST,
+        key=len,
+        reverse=True
+    ):
+        if u in text:
+            return u
 
     return "件"
 
