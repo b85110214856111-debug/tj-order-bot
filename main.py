@@ -2,6 +2,9 @@
 # LINE + FastAPI + Google Sheets 訂單系統（商用整合版）
 import os
 import re
+from openai import OpenAI
+import base64
+
 from datetime import datetime
 from tracemalloc import start
 from fastapi import FastAPI, Request
@@ -24,6 +27,9 @@ LINE_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
 SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
 
 line_bot_api = LineBotApi(LINE_TOKEN)
+client = OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY")
+)
 
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -128,8 +134,147 @@ def init_sheets():
 
     raise Exception("Google Sheet無法連線")
 sheet, customer_sheet, settings_sheet = init_sheets()
+pending_orders = {}
 DELIVERY_LIST = ["自取","自送","代送","業務自送","寄大榮","寄黑貓","寄順豐","寄梓華榮"]
 
+def parse_order_image(image_bytes):
+
+    image_base64 = base64.b64encode(
+        image_bytes
+    ).decode()
+
+    response = client.chat.completions.create(
+        model="gpt-4.1",
+        messages=[
+            {
+                "role":"user",
+                "content":[
+                    {
+                        "type":"text",
+                        "text":"""
+辨識這張訂單圖片。
+
+請轉成JSON：
+
+[
+ {
+   "date":"",
+   "customer":"",
+   "product":"",
+   "qty":0,
+   "unit":"",
+   "price":0,
+   "delivery":"",
+   "note":""
+ }
+]
+
+只輸出JSON
+"""
+                    },
+                    {
+                        "type":"image_url",
+                        "image_url":{
+                            "url":
+                            f"data:image/jpeg;base64,{image_base64}"
+                        }
+                    }
+                ]
+            }
+        ]
+    )
+
+    return json.loads(
+        response.choices[0]
+        .message.content
+    )
+
+def format_orders(orders):
+
+    lines = []
+
+    for i, o in enumerate(
+        orders,
+        start=1
+    ):
+
+        lines.append(
+            f"{i}. "
+            f"{o['date']} "
+            f"{o['customer']} "
+            f"{o['product']} "
+            f"{o['qty']}{o['unit']}"
+        )
+
+    return "\n".join(lines)
+
+def edit_pending_order(
+    user_id,
+    text
+):
+
+    if user_id not in pending_orders:
+        return "❌ 沒有待確認訂單"
+
+    m = re.match(
+        r"修改\s+(\d+)\s+(日期|客戶|商品|數量|單價|配送|備註)\s+(.+)",
+        text
+    )
+
+    if not m:
+        return "❌ 格式錯誤"
+
+    idx = int(m.group(1)) - 1
+
+    field = m.group(2)
+
+    value = m.group(3)
+
+    orders = pending_orders[user_id]
+
+    if idx >= len(orders):
+        return "❌ 找不到項目"
+
+    order = orders[idx]
+
+    field_map = {
+        "日期":"date",
+        "客戶":"customer",
+        "商品":"product",
+        "單價":"price",
+        "配送":"delivery",
+        "備註":"note"
+    }
+
+    if field == "數量":
+
+        qty_match = re.match(
+            r"(\d+(?:\.\d+)?)(.*)",
+            value
+        )
+
+        if not qty_match:
+            return "❌ 數量格式錯誤"
+
+        order["qty"] = float(
+            qty_match.group(1)
+        )
+
+        unit = qty_match.group(2).strip()
+
+        if unit:
+            order["unit"] = unit
+
+    else:
+
+        order[
+            field_map[field]
+        ] = value
+
+    return (
+        "✅ 已修改\n\n"
+        + format_orders(orders)
+    )
 
 def export_orders(keyword):
 
@@ -1329,6 +1474,44 @@ async def callback(request: Request):
 
     for event in body["events"]:
 
+        if (
+            event["type"] == "message"
+            and
+            event["message"]["type"] == "image"
+        ):
+
+            user_id = event["source"]["userId"]
+
+            message_id = event["message"]["id"]
+
+            content = line_bot_api.get_message_content(
+                message_id
+            )
+
+            image_data = BytesIO()
+
+            for chunk in content.iter_content():
+
+                image_data.write(chunk)
+
+            orders = parse_order_image(
+                image_data.getvalue()
+            )
+
+            pending_orders[user_id] = orders
+
+            line_bot_api.reply_message(
+                event["replyToken"],
+                TextSendMessage(
+                    text=
+                    "📋 AI辨識完成\n\n"
+                    + format_orders(orders)
+                    + "\n\n可輸入：\n修改\n確認\n取消"
+                )
+            )
+
+            continue
+
         if event["type"] != "message":
             continue
 
@@ -1388,6 +1571,65 @@ async def callback(request: Request):
         results = []
 
         for cmd in commands:
+
+            if cmd.startswith("修改"):
+
+                results.append(
+                    edit_pending_order(
+                        user_id,
+                        cmd
+                    )
+                )
+
+                continue
+
+            elif cmd == "預覽":
+
+                    if user_id not in pending_orders:
+
+                        results.append(
+                            "❌ 沒有待確認訂單"
+                        )
+
+                    else:
+
+                        results.append(
+                            format_orders(
+                                pending_orders[user_id]
+                            )
+                        )
+
+            elif cmd == "確認":
+
+                if user_id not in pending_orders:
+
+                    results.append(
+                        "❌ 沒有待確認訂單"
+                    )
+
+                else:
+
+                    count = save_orders_batch(
+                        pending_orders[user_id],
+                        user_name
+                    )
+
+                    del pending_orders[user_id]
+
+                    results.append(
+                        f"✅ 已建立 {count} 筆訂單"
+                    )
+
+            elif cmd == "取消":
+
+                pending_orders.pop(
+                    user_id,
+                    None
+                )
+
+                results.append(
+                "✅ 已取消此次訂單"
+                )
 
             if cmd.startswith("查詢"):
 
