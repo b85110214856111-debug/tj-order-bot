@@ -1607,24 +1607,7 @@ def restore_last_delete():
 
     return f"✅ 已復原最後一次刪除，共 {restored} 筆"
 
-def ai_correct(text):
 
-    rows = ai_sheet.get_all_values()
-
-    for r in rows[1:]:
-
-        if len(r) < 2:
-            continue
-
-        wrong = r[0]
-        correct = r[1]
-
-        text = text.replace(
-            wrong,
-            correct
-        )
-
-    return text
 
 @app.get("/files")
 def files():
