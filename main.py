@@ -147,14 +147,14 @@ def parse_order_image(image_bytes):
         model="gpt-4.1",
         messages=[
             {
-                "role":"user",
-                "content":[
+                "role": "user",
+                "content": [
                     {
-                        "type":"text",
-                        "text":"""
+                        "type": "text",
+                        "text": """
 辨識這張訂單圖片。
 
-請轉成JSON：
+輸出格式：
 
 [
  {
@@ -169,25 +169,61 @@ def parse_order_image(image_bytes):
  }
 ]
 
-只輸出JSON
+只允許輸出 JSON。
+禁止 markdown。
+禁止 ```json。
+禁止任何解釋文字。
 """
                     },
                     {
-                        "type":"image_url",
-                        "image_url":{
+                        "type": "image_url",
+                        "image_url": {
                             "url":
                             f"data:image/jpeg;base64,{image_base64}"
                         }
                     }
                 ]
             }
-        ]
+        ],
+        temperature=0
     )
 
-    return json.loads(
+    content = (
         response.choices[0]
         .message.content
     )
+
+    if not content:
+        return []
+
+    content = content.strip()
+
+    content = content.replace(
+        "```json",
+        ""
+    )
+
+    content = content.replace(
+        "```",
+        ""
+    )
+
+    content = content.strip()
+
+    print("===== GPT回傳 =====")
+    print(content)
+    print("===================")
+
+    try:
+        return json.loads(content)
+
+    except Exception as e:
+
+        print("JSON解析失敗")
+        print(e)
+        print(content)
+
+        return []
 
 def format_orders(orders):
 
