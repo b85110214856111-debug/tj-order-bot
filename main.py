@@ -84,8 +84,13 @@ def upload_excel_file(wb):
 
 import json
 
+google_credentials = os.getenv("GOOGLE_CREDENTIALS")
+
+if not google_credentials:
+    raise Exception("GOOGLE_CREDENTIALS 未設定")
+
 service_account_info = json.loads(
-    os.getenv("GOOGLE_CREDENTIALS")
+    google_credentials
 )
 
 creds = Credentials.from_service_account_info(
@@ -96,10 +101,33 @@ creds = Credentials.from_service_account_info(
 
 gc = gspread.authorize(creds)
 
+import time
 
-sheet = gc.open_by_key(SHEET_ID).sheet1
-customer_sheet = gc.open_by_key(SHEET_ID).worksheet("Customers")
-settings_sheet = gc.open_by_key(SHEET_ID).worksheet("Settings")
+def init_sheets():
+
+    for retry in range(5):
+
+        try:
+
+            book = gc.open_by_key(SHEET_ID)
+
+            return (
+                book.sheet1,
+                book.worksheet("Customers"),
+                book.worksheet("Settings")
+            )
+
+        except Exception as e:
+
+            print(
+                f"Google Sheet連線失敗 "
+                f"{retry+1}/5 : {e}"
+            )
+
+            time.sleep(5)
+
+    raise Exception("Google Sheet無法連線")
+sheet, customer_sheet, settings_sheet = init_sheets()
 DELIVERY_LIST = ["自取","自送","代送","業務自送","寄大榮","寄黑貓","寄順豐","寄梓華榮"]
 
 
