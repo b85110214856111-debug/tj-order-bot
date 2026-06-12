@@ -15,7 +15,10 @@ from fastapi.responses import FileResponse
 import gspread
 from google.oauth2.service_account import Credentials
 from linebot import LineBotApi
-from linebot.models import TextSendMessage
+from linebot.models import (
+    TextSendMessage,
+    FlexSendMessage
+)
 load_dotenv()
 print(os.getenv("GOOGLE_DRIVE_FOLDER_ID"))
 app = FastAPI()
@@ -135,6 +138,7 @@ def init_sheets():
     raise Exception("Google Sheet無法連線")
 sheet, customer_sheet, settings_sheet = init_sheets()
 pending_orders = {}
+edit_status = {}
 DELIVERY_LIST = ["自取","自送","代送","業務自送","寄大榮","寄黑貓","寄順豐","寄梓華榮"]
 
 def parse_order_image(image_bytes):
@@ -358,6 +362,102 @@ def format_orders(orders):
         )
 
     return "\n".join(lines)
+
+def build_order_flex(orders):
+
+    contents = []
+
+    for i, o in enumerate(orders):
+
+        contents.append(
+            {
+                "type": "box",
+                "layout": "vertical",
+                "margin": "md",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text":
+                        f"{i+1}. {o['product']} "
+                        f"{o['qty']}{o['unit']}",
+                        "weight": "bold"
+                    },
+                    {
+                        "type": "text",
+                        "text":
+                        f"日期:{o['date']}"
+                    },
+                    {
+                        "type": "text",
+                        "text":
+                        f"客戶:{o['customer']}"
+                    },
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type":"button",
+                                "style":"primary",
+                                "height":"sm",
+                                "action":{
+                                    "type":"message",
+                                    "label":"修改",
+                                    "text":f"EDIT_{i}"
+                                }
+                            },
+                            {
+                                "type":"button",
+                                "style":"secondary",
+                                "height":"sm",
+                                "action":{
+                                    "type":"message",
+                                    "label":"刪除",
+                                    "text":f"DELETE_{i}"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        )
+
+    contents.append(
+        {
+            "type":"button",
+            "style":"primary",
+            "action":{
+                "type":"message",
+                "label":"確認送出",
+                "text":"CONFIRM_ORDER"
+            }
+        }
+    )
+
+    contents.append(
+        {
+            "type":"button",
+            "style":"secondary",
+            "action":{
+                "type":"message",
+                "label":"取消",
+                "text":"CANCEL_ORDER"
+            }
+        }
+    )
+
+    return FlexSendMessage(
+        alt_text="訂單確認",
+        contents={
+            "type":"bubble",
+            "body":{
+                "type":"box",
+                "layout":"vertical",
+                "contents":contents
+            }
+        }
+    )
 
 def edit_pending_order(
     user_id,
@@ -1683,12 +1783,7 @@ async def callback(request: Request):
 
             line_bot_api.reply_message(
                 event["replyToken"],
-                TextSendMessage(
-                    text=
-                    "📋 AI辨識完成\n\n"
-                    + "\n\n".join(preview)
-                    + "\n\n可輸入：\n修改 1 商品 高麗菜\n確認\n取消"
-                )
+                build_order_flex(orders)
             )
 
             continue
@@ -1753,6 +1848,70 @@ async def callback(request: Request):
 
         for cmd in commands:
 
+            if user_id in edit_status:
+
+                idx = edit_status[user_id]
+
+                data = parse_order_line(
+                    f"1/1 客戶 {cmd}"
+                )
+
+                if data:
+
+                    pending_orders[user_id][idx].update(
+                        {
+                            "product":data["product"],
+                            "qty":data["qty"],
+                            "unit":data["unit"],
+                            "price":data["price"]
+                        }
+                    )
+        
+
+                    del edit_status[user_id]
+
+                    results.append(
+                        "✅ 已修改"
+                    )
+
+                continue
+
+            if cmd.startswith("EDIT_"):
+
+                idx = int(
+                    cmd.replace(
+                        "EDIT_",
+                        ""
+                    )
+                )
+
+                edit_status[user_id] = idx
+
+                results.append(
+                    "請輸入新內容\n\n"
+                    "格式:\n"
+                    "高麗菜 25箱 @500"
+                )
+
+                continue
+            
+            if cmd.startswith("DELETE_"):
+
+                idx = int(
+                    cmd.replace(
+                        "DELETE_",
+                        ""
+                    )
+                )
+
+                del pending_orders[user_id][idx]
+
+                results.append(
+                    "✅ 已刪除"
+                )
+
+                continue
+
             if cmd.startswith("修改"):
 
                 results.append(
@@ -1780,7 +1939,10 @@ async def callback(request: Request):
                             )
                         )
 
-            elif cmd == "確認":
+            elif cmd in [
+                "確認",
+                "CONFIRM_ORDER"
+            ]:
 
                 if user_id not in pending_orders:
 
@@ -1801,7 +1963,10 @@ async def callback(request: Request):
                         f"✅"
                     )
 
-            elif cmd == "取消":
+            elif cmd in [
+                "取消",
+                "CANCEL_ORDER"
+            ]:
 
                 pending_orders.pop(
                     user_id,
