@@ -15,10 +15,7 @@ from fastapi.responses import FileResponse
 import gspread
 from google.oauth2.service_account import Credentials
 from linebot import LineBotApi
-from linebot.models import (
-    TextSendMessage,
-    FlexSendMessage
-)
+from linebot.models import TextSendMessage
 load_dotenv()
 print(os.getenv("GOOGLE_DRIVE_FOLDER_ID"))
 app = FastAPI()
@@ -138,7 +135,6 @@ def init_sheets():
     raise Exception("Google Sheet無法連線")
 sheet, customer_sheet, settings_sheet = init_sheets()
 pending_orders = {}
-edit_status = {}
 DELIVERY_LIST = ["自取","自送","代送","業務自送","寄大榮","寄黑貓","寄順豐","寄梓華榮"]
 
 def parse_order_image(image_bytes):
@@ -210,140 +206,6 @@ def parse_order_image(image_bytes):
 
         return []
 
-
-def parse_purchase_order_image(image_bytes):
-
-    import json
-    import base64
-
-    image_base64 = base64.b64encode(
-        image_bytes
-    ).decode()
-
-    response = client.chat.completions.create(
-        model="gpt-4.1",
-        messages=[
-            {
-                "role":"user",
-                "content":[
-                    {
-                        "type":"text",
-                        "text":"""
-這是一張採購單。
-
-請辨識表格資料。
-
-採購公司通常為：
-佳佳農產品實業有限公司
-
-請擷取：
-
-交貨日期 -> date
-品名 -> product
-數量 -> qty
-單位 -> unit
-單價 -> price
-備註 -> note
-
-customer固定填：
-
-佳佳農產品實業有限公司
-
-delivery固定空白
-
-輸出格式：
-
-[
- {
-   "date":"",
-   "customer":"",
-   "product":"",
-   "qty":0,
-   "unit":"",
-   "price":0,
-   "delivery":"",
-   "note":""
- }
-]
-
-規則：
-
-1. 每個交貨日期算一筆
-2. 保留完整商品名稱
-3. qty只能輸出數字
-4. price只能輸出數字
-5. note保留完整內容
-6. 只輸出JSON
-7. 禁止markdown
-8. 禁止任何說明文字
-"""
-                    },
-                    {
-                        "type":"image_url",
-                        "image_url":{
-                            "url":
-                            f"data:image/jpeg;base64,{image_base64}"
-                        }
-                    }
-                ]
-            }
-        ]
-    )
-
-    content = (
-        response
-        .choices[0]
-        .message
-        .content
-        .strip()
-    )
-
-    print(content)
-
-    try:
-        return json.loads(content)
-
-    except Exception as e:
-
-        print("JSON解析失敗")
-        print(content)
-
-        return []
-    
-def detect_purchase_order(image_bytes):
-
-    image_base64 = base64.b64encode(
-        image_bytes
-    ).decode()
-
-    response = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=[
-            {
-                "role":"user",
-                "content":[
-                    {
-                        "type":"text",
-                        "text":"這是不是採購單？只回答 YES 或 NO"
-                    },
-                    {
-                        "type":"image_url",
-                        "image_url":{
-                            "url":
-                            f"data:image/jpeg;base64,{image_base64}"
-                        }
-                    }
-                ]
-            }
-        ]
-    )
-
-    return (
-        "YES"
-        in response.choices[0]
-        .message.content.upper()
-    )
-
 def format_orders(orders):
 
     lines = []
@@ -362,102 +224,6 @@ def format_orders(orders):
         )
 
     return "\n".join(lines)
-
-def build_order_flex(orders):
-
-    contents = []
-
-    for i, o in enumerate(orders):
-
-        contents.append(
-            {
-                "type": "box",
-                "layout": "vertical",
-                "margin": "md",
-                "contents": [
-                    {
-                        "type": "text",
-                        "text":
-                        f"{i+1}. {o['product']} "
-                        f"{o['qty']}{o['unit']}",
-                        "weight": "bold"
-                    },
-                    {
-                        "type": "text",
-                        "text":
-                        f"日期:{o['date']}"
-                    },
-                    {
-                        "type": "text",
-                        "text":
-                        f"客戶:{o['customer']}"
-                    },
-                    {
-                        "type": "box",
-                        "layout": "horizontal",
-                        "spacing": "sm",
-                        "contents": [
-                            {
-                                "type":"button",
-                                "style":"primary",
-                                "height":"sm",
-                                "action":{
-                                    "type":"message",
-                                    "label":"修改",
-                                    "text":f"EDIT_{i}"
-                                }
-                            },
-                            {
-                                "type":"button",
-                                "style":"secondary",
-                                "height":"sm",
-                                "action":{
-                                    "type":"message",
-                                    "label":"刪除",
-                                    "text":f"DELETE_{i}"
-                                }
-                            }
-                        ]
-                    }
-                ]
-            }
-        )
-
-    contents.append(
-        {
-            "type":"button",
-            "style":"primary",
-            "action":{
-                "type":"message",
-                "label":"確認送出",
-                "text":"CONFIRM_ORDER"
-            }
-        }
-    )
-
-    contents.append(
-        {
-            "type":"button",
-            "style":"secondary",
-            "action":{
-                "type":"message",
-                "label":"取消",
-                "text":"CANCEL_ORDER"
-            }
-        }
-    )
-
-    return FlexSendMessage(
-        alt_text="訂單確認",
-        contents={
-            "type":"bubble",
-            "body":{
-                "type":"box",
-                "layout":"vertical",
-                "contents":contents
-            }
-        }
-    )
 
 def edit_pending_order(
     user_id,
@@ -659,7 +425,7 @@ def customer_setting(text):
                 [[customer, product, qty_unit, price]]
             )
 
-            return "✅ 已更新"
+            return "✅ 已更新客戶"
 
     customer_sheet.append_row([
         customer,
@@ -668,7 +434,7 @@ def customer_setting(text):
         price
     ])
 
-    return "✅ 已新增"
+    return "✅ 已新增客戶"
 
 def customer_query(text):
 
@@ -840,7 +606,7 @@ def create_schedule_order(text):
             "SYSTEM"
         )
 
-        return f"✅ 已建立 {count} 筆"
+        return f"✅ 已建立 {count} 筆排程訂單"
 
     text = text.strip()
 
@@ -940,7 +706,7 @@ def create_schedule_order(text):
         "SYSTEM"
     )
 
-    return f"✅ 已建立 {count} 筆"
+    return f"✅ 已建立 {count} 筆固定排程訂單"
 
     
 
@@ -1115,7 +881,7 @@ def edit_order(text):
     if updated == 0:
         return "❌ 找不到符合訂單"
 
-    return f"✅ 已修改 {updated} 筆"
+    return f"✅ 已修改 {updated} 筆訂單"
 
 def parse_unit(text):
 
@@ -1446,7 +1212,7 @@ def delete_order(text, user_id):
                 )
 
                 deleted += 1
-        return f"✅ 已刪除 {deleted} 筆" if deleted else "❌ 找不到訂單"
+        return f"✅ 已刪除 {deleted} 筆訂單" if deleted else "❌ 找不到訂單"
 
     dates = [x for x in parts[1:] if re.match(r"\d{1,2}/\d{1,2}", x)]
     customers = [x for x in parts[1:] if not re.match(r"\d{1,2}/\d{1,2}", x)]
@@ -1481,7 +1247,7 @@ def delete_order(text, user_id):
 
                 deleted += 1
 
-        return f"✅ 已刪除 {deleted} 筆" if deleted else "❌ 找不到訂單"
+        return f"✅ 已刪除 {deleted} 筆訂單" if deleted else "❌ 找不到訂單"
 
 # 日期 + 客戶
 
@@ -1519,7 +1285,7 @@ def delete_order(text, user_id):
 
             deleted += 1
 
-    return f"✅ 已刪除 {deleted} 筆" if deleted else "❌ 找不到訂單"
+    return f"✅ 已刪除 {deleted} 筆訂單" if deleted else "❌ 找不到訂單"
 
 def restore_order(text):
     if text.strip() in ["復原最後刪除", "還原最後刪除"]:
@@ -1560,7 +1326,7 @@ def restore_order(text):
                 restored += 1
 
         return (
-            f"✅ 已復原 {restored} 筆"
+            f"✅ 已復原 {restored} 筆訂單"
             if restored
             else "❌ 找不到已刪除訂單"
         )
@@ -1607,7 +1373,7 @@ def restore_order(text):
                 restored += 1
 
         return (
-        f"✅ 已復原 {restored} 筆"
+        f"✅ 已復原 {restored} 筆訂單"
         if restored
         else "❌ 找不到已刪除訂單"
         )
@@ -1646,7 +1412,7 @@ def restore_order(text):
             restored += 1
 
     return (
-        f"✅ 已復原 {restored} 筆"
+        f"✅ 已復原 {restored} 筆訂單"
         if restored
         else "❌ 找不到已刪除訂單"
     )
@@ -1705,9 +1471,7 @@ def restore_last_delete():
 
             restored += 1
 
-    return f"✅ 已復原，共 {restored} 筆"
-
-
+    return f"✅ 已復原最後一次刪除，共 {restored} 筆"
 
 @app.get("/files")
 def files():
@@ -1747,19 +1511,9 @@ async def callback(request: Request):
 
                 image_data.write(chunk)
 
-            img = image_data.getvalue()
-
-            if detect_purchase_order(img):
-
-                orders = parse_purchase_order_image(
-                    img
-                )
-
-            else:
-
-                orders = parse_order_image(
-                    img
-                )
+            orders = parse_order_image(
+                image_data.getvalue()
+            )
 
             pending_orders[user_id] = orders
 
@@ -1783,7 +1537,12 @@ async def callback(request: Request):
 
             line_bot_api.reply_message(
                 event["replyToken"],
-                build_order_flex(orders)
+                TextSendMessage(
+                    text=
+                    "📋 AI辨識完成\n\n"
+                    + "\n\n".join(preview)
+                    + "\n\n可輸入：\n修改 1 商品 高麗菜\n確認\n取消"
+                )
             )
 
             continue
@@ -1848,70 +1607,6 @@ async def callback(request: Request):
 
         for cmd in commands:
 
-            if user_id in edit_status:
-
-                idx = edit_status[user_id]
-
-                data = parse_order_line(
-                    f"1/1 客戶 {cmd}"
-                )
-
-                if data:
-
-                    pending_orders[user_id][idx].update(
-                        {
-                            "product":data["product"],
-                            "qty":data["qty"],
-                            "unit":data["unit"],
-                            "price":data["price"]
-                        }
-                    )
-        
-
-                    del edit_status[user_id]
-
-                    results.append(
-                        "✅ 已修改"
-                    )
-
-                continue
-
-            if cmd.startswith("EDIT_"):
-
-                idx = int(
-                    cmd.replace(
-                        "EDIT_",
-                        ""
-                    )
-                )
-
-                edit_status[user_id] = idx
-
-                results.append(
-                    "請輸入新內容\n\n"
-                    "格式:\n"
-                    "高麗菜 25箱 @500"
-                )
-
-                continue
-            
-            if cmd.startswith("DELETE_"):
-
-                idx = int(
-                    cmd.replace(
-                        "DELETE_",
-                        ""
-                    )
-                )
-
-                del pending_orders[user_id][idx]
-
-                results.append(
-                    "✅ 已刪除"
-                )
-
-                continue
-
             if cmd.startswith("修改"):
 
                 results.append(
@@ -1939,10 +1634,7 @@ async def callback(request: Request):
                             )
                         )
 
-            elif cmd in [
-                "確認",
-                "CONFIRM_ORDER"
-            ]:
+            elif cmd == "確認":
 
                 if user_id not in pending_orders:
 
@@ -1960,13 +1652,10 @@ async def callback(request: Request):
                     del pending_orders[user_id]
 
                     results.append(
-                        f"✅"
+                        f"✅ 已建立 {count} 筆訂單"
                     )
 
-            elif cmd in [
-                "取消",
-                "CANCEL_ORDER"
-            ]:
+            elif cmd == "取消":
 
                 pending_orders.pop(
                     user_id,
@@ -1974,7 +1663,7 @@ async def callback(request: Request):
                 )
 
                 results.append(
-                "✅"
+                "✅ 已取消此次訂單"
                 )
 
             if cmd.startswith("查詢"):
@@ -2085,7 +1774,7 @@ async def callback(request: Request):
                         count = 1
 
                 results.append(
-                    f"✅"
+                    f"✅ 已建立 {count} 筆訂單"
                     if count > 0
                     else "❌ 格式錯誤"
                 )
