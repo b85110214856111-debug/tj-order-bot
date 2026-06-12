@@ -559,7 +559,7 @@ def customer_setting(text):
                 [[customer, product, qty_unit, price]]
             )
 
-            return "✅ 已更新客戶"
+            return "✅ 已更新"
 
     customer_sheet.append_row([
         customer,
@@ -568,7 +568,7 @@ def customer_setting(text):
         price
     ])
 
-    return "✅ 已新增客戶"
+    return "✅ 已新增"
 
 def customer_query(text):
 
@@ -740,7 +740,7 @@ def create_schedule_order(text):
             "SYSTEM"
         )
 
-        return f"✅ 已建立 {count} 筆排程訂單"
+        return f"✅ 已建立 {count} 筆"
 
     text = text.strip()
 
@@ -840,7 +840,7 @@ def create_schedule_order(text):
         "SYSTEM"
     )
 
-    return f"✅ 已建立 {count} 筆固定排程訂單"
+    return f"✅ 已建立 {count} 筆"
 
     
 
@@ -1015,7 +1015,7 @@ def edit_order(text):
     if updated == 0:
         return "❌ 找不到符合訂單"
 
-    return f"✅ 已修改 {updated} 筆訂單"
+    return f"✅ 已修改 {updated} 筆"
 
 def parse_unit(text):
 
@@ -1346,7 +1346,7 @@ def delete_order(text, user_id):
                 )
 
                 deleted += 1
-        return f"✅ 已刪除 {deleted} 筆訂單" if deleted else "❌ 找不到訂單"
+        return f"✅ 已刪除 {deleted} 筆" if deleted else "❌ 找不到訂單"
 
     dates = [x for x in parts[1:] if re.match(r"\d{1,2}/\d{1,2}", x)]
     customers = [x for x in parts[1:] if not re.match(r"\d{1,2}/\d{1,2}", x)]
@@ -1381,7 +1381,7 @@ def delete_order(text, user_id):
 
                 deleted += 1
 
-        return f"✅ 已刪除 {deleted} 筆訂單" if deleted else "❌ 找不到訂單"
+        return f"✅ 已刪除 {deleted} 筆" if deleted else "❌ 找不到訂單"
 
 # 日期 + 客戶
 
@@ -1419,7 +1419,7 @@ def delete_order(text, user_id):
 
             deleted += 1
 
-    return f"✅ 已刪除 {deleted} 筆訂單" if deleted else "❌ 找不到訂單"
+    return f"✅ 已刪除 {deleted} 筆" if deleted else "❌ 找不到訂單"
 
 def restore_order(text):
     if text.strip() in ["復原最後刪除", "還原最後刪除"]:
@@ -1460,7 +1460,7 @@ def restore_order(text):
                 restored += 1
 
         return (
-            f"✅ 已復原 {restored} 筆訂單"
+            f"✅ 已復原 {restored} 筆"
             if restored
             else "❌ 找不到已刪除訂單"
         )
@@ -1507,7 +1507,7 @@ def restore_order(text):
                 restored += 1
 
         return (
-        f"✅ 已復原 {restored} 筆訂單"
+        f"✅ 已復原 {restored} 筆"
         if restored
         else "❌ 找不到已刪除訂單"
         )
@@ -1546,7 +1546,7 @@ def restore_order(text):
             restored += 1
 
     return (
-        f"✅ 已復原 {restored} 筆訂單"
+        f"✅ 已復原 {restored} 筆"
         if restored
         else "❌ 找不到已刪除訂單"
     )
@@ -1605,7 +1605,7 @@ def restore_last_delete():
 
             restored += 1
 
-    return f"✅ 已復原最後一次刪除，共 {restored} 筆"
+    return f"✅ 已復原，共 {restored} 筆"
 
 
 
@@ -1798,7 +1798,7 @@ async def callback(request: Request):
                     del pending_orders[user_id]
 
                     results.append(
-                        f"✅ 已建立 {count} 筆訂單"
+                        f"✅"
                     )
 
             elif cmd == "取消":
@@ -1809,7 +1809,7 @@ async def callback(request: Request):
                 )
 
                 results.append(
-                "✅ 已取消此次訂單"
+                "✅"
                 )
 
             if cmd.startswith("查詢"):
@@ -1920,7 +1920,7 @@ async def callback(request: Request):
                         count = 1
 
                 results.append(
-                    f"✅ 已建立 {count} 筆訂單"
+                    f"✅"
                     if count > 0
                     else "❌ 格式錯誤"
                 )
