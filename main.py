@@ -332,7 +332,7 @@ def create_schedule_order(text):
             return "❌ 客戶未設定"
 
         product = parts[1] if len(parts) >= 2 else None
-        
+
         if not product:
             product = customer_data[1]
 
@@ -343,6 +343,7 @@ def create_schedule_order(text):
 
         if price == 0:
             price = float(customer_data[3])
+
 
         weekday_map = {
             "一":0,
