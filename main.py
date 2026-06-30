@@ -454,7 +454,7 @@ def create_schedule_order(text):
 
     if "下週開始" in text:
         start_next_week = True
-        text = text.replace("下週開始", "")
+        text = text.replace("下週開始", "", 1).strip()
 
     m = re.match(
         r"(\S+)\s+每週([一二三四五六日]+)到貨到月底",
