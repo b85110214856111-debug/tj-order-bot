@@ -444,7 +444,7 @@ def create_schedule_order(text):
             "SYSTEM"
         )
 
-        return f"✅ 已建立 {count} 筆排程訂單"
+        return f"✅ 已建立 {count} 筆排程"
 
     text = text.strip()
 
@@ -544,7 +544,7 @@ def create_schedule_order(text):
         "SYSTEM"
     )
 
-    return f"✅ 已建立 {count} 筆固定排程訂單"
+    return f"✅ 已建立 {count} 筆固定排程"
 
     
 
@@ -728,7 +728,7 @@ def edit_order(text):
     if updated == 0:
         return "❌ 找不到符合訂單"
 
-    return f"✅ 已修改 {updated} 筆訂單"
+    return f"✅ 已改 {updated} 筆"
 
 def parse_unit(text):
 
@@ -1059,7 +1059,7 @@ def delete_order(text, user_id):
                 )
 
                 deleted += 1
-        return f"✅ 已刪除 {deleted} 筆訂單" if deleted else "❌ 找不到訂單"
+        return f"✅ 已刪 {deleted} 筆" if deleted else "❌ 找不到訂單"
 
     dates = [x for x in parts[1:] if re.match(r"\d{1,2}/\d{1,2}", x)]
 
@@ -1098,7 +1098,7 @@ def delete_order(text, user_id):
 
                 deleted += 1
 
-        return f"✅ 已刪除 {deleted} 筆訂單" if deleted else "❌ 找不到訂單"
+        return f"✅ 已刪 {deleted} 筆" if deleted else "❌ 找不到訂單"
 
 # 日期 + 客戶
 
@@ -1148,7 +1148,7 @@ def delete_order(text, user_id):
 
         deleted += 1
 
-    return f"✅ 已刪除 {deleted} 筆訂單" if deleted else "❌ 找不到訂單"
+    return f"✅ 已刪 {deleted} 筆" if deleted else "❌ 找不到訂單"
 
 def restore_order(text):
     if text.strip() in ["復原最後刪除", "還原最後刪除"]:
@@ -1189,7 +1189,7 @@ def restore_order(text):
                 restored += 1
 
         return (
-            f"✅ 已復原 {restored} 筆訂單"
+            f"✅ 已復原 {restored} 筆"
             if restored
             else "❌ 找不到已刪除訂單"
         )
@@ -1239,7 +1239,7 @@ def restore_order(text):
                 restored += 1
 
         return (
-        f"✅ 已復原 {restored} 筆訂單"
+        f"✅ 已復原 {restored} 筆"
         if restored
         else "❌ 找不到已刪除訂單"
         )
@@ -1281,7 +1281,7 @@ def restore_order(text):
         restored += 1
 
     return (
-        f"✅ 已復原 {restored} 筆訂單"
+        f"✅ 已復原 {restored} 筆"
         if restored
         else "❌ 找不到已刪除訂單"
     )
@@ -1528,7 +1528,7 @@ async def callback(request: Request):
                         count = 1
 
                 results.append(
-                    f"✅ 已建立 {count} 筆訂單"
+                    f"✅ 已建 {count} 筆"
                     if count > 0
                     else "❌ 格式錯誤"
                 )
