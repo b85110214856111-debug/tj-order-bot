@@ -306,6 +306,12 @@ def create_schedule_order(text):
 
     # 三行排程模式
     if len(lines) >= 3:
+        product = None
+        qty = None
+        unit = None
+        price = 0
+        delivery = ""
+        note = ""
 
         order_text = lines[0]
 
@@ -325,7 +331,9 @@ def create_schedule_order(text):
         if not customer_data:
             return "❌ 客戶未設定"
 
-        if product is None:
+        product = parts[1] if len(parts) >= 2 else None
+        
+        if not product:
             product = customer_data[1]
 
         if qty is None:
@@ -344,17 +352,7 @@ def create_schedule_order(text):
             "五":4,
             "六":5,
             "日":6
-        }
-
-        product = None
-        qty = None
-        unit = None
-        price = 0
-        delivery = ""
-        note = ""
-        
-        delivery = ""
-        note = ""
+        }    
 
         # 商品
         if len(parts) >= 2:
