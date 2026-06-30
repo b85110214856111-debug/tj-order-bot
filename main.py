@@ -325,6 +325,17 @@ def create_schedule_order(text):
         if not customer_data:
             return "❌ 客戶未設定"
 
+        if product is None:
+            product = customer_data[1]
+
+        if qty is None:
+            qty_match = re.search(r"(\d+(?:\.\d+)?)", customer_data[2])
+            qty = float(qty_match.group(1))
+            unit = parse_unit(customer_data[2])
+
+        if price == 0:
+            price = float(customer_data[3])
+
         weekday_map = {
             "一":0,
             "二":1,
@@ -335,20 +346,13 @@ def create_schedule_order(text):
             "日":6
         }
 
-
-        # 商品
-        if not product:
-            product = customer_data[1]
-
-        # 數量
-        if qty is None:
-            qty_match = re.search(r"(\d+(?:\.\d+)?)", customer_data[2])
-            qty = float(qty_match.group(1))
-            unit = parse_unit(customer_data[2])
-
-        # 單價
-        if price == 0:
-            price = float(customer_data[3])
+        product = None
+        qty = None
+        unit = None
+        price = 0
+        delivery = ""
+        note = ""
+        
         delivery = ""
         note = ""
 
