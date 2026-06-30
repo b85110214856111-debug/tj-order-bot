@@ -307,14 +307,17 @@ def create_schedule_order(text):
     # 三行排程模式
     if len(lines) >= 3:
 
-        customer = lines[0]
+        order_text = lines[0]
+
+        parts = order_text.split()
+
+        customer = parts[0]
 
         rows = customer_sheet.get_all_values()
 
         customer_data = None
 
         for r in rows[1:]:
-
             if r[0] == customer:
                 customer_data = r
                 break
@@ -332,24 +335,74 @@ def create_schedule_order(text):
             "日":6
         }
 
-        product = customer_data[1]
 
-        qty_match = re.search(
-            r"(\d+(?:\.\d+)?)",
-            customer_data[2]
-        )
+        # 商品
+        if not product:
+            product = customer_data[1]
 
-        qty = float(qty_match.group(1))
+        # 數量
+        if qty is None:
+            qty_match = re.search(r"(\d+(?:\.\d+)?)", customer_data[2])
+            qty = float(qty_match.group(1))
+            unit = parse_unit(customer_data[2])
 
-        unit = parse_unit(
-            customer_data[2]
-        )
+        # 單價
+        if price == 0:
+            price = float(customer_data[3])
+        delivery = ""
+        note = ""
 
-        price = float(customer_data[3])
+        # 商品
+        if len(parts) >= 2:
+            product = parts[1]
+
+        # 數量
+        for p in parts[2:]:
+
+            m = re.match(r"(\d+(?:\.\d+)?)(.*)", p)
+
+            if not m:
+                continue
+
+            qty = float(m.group(1))
+
+            remain = m.group(2).strip()
+
+            if remain:
+                unit = parse_unit(remain)
+
+            break
+
+        # 單價
+        for p in parts:
+
+            if p.startswith("@"):
+                try:
+                    price = float(p[1:])
+                except:
+                    pass
+
+        # 配送
+        delivery = detect_delivery(order_text)
+
+        # 備註
+        note = order_text
+
+        note = note.replace(customer, "", 1)
+        note = note.replace(product, "", 1)
+
+        note = re.sub(r"\d+(?:\.\d+)?[^\s]*", "", note)
+        note = re.sub(r"@\d+(?:\.\d+)?", "", note)
+
+        if delivery:
+            note = note.replace(delivery, "")
+
+        note = note.strip()
 
         today = datetime.now().date()
 
         orders = []
+        added_dates = set()
 
         # 下週四、五到貨
 
@@ -370,14 +423,23 @@ def create_schedule_order(text):
 
             next_week_start = today + timedelta(days=7)
 
+            added_dates = set()
+
             for i in range(7):
 
                 d = next_week_start + timedelta(days=i)
 
                 if d.weekday() in target_days:
 
+                    date_str = f"{d.month}/{d.day}"
+
+                    if date_str in added_dates:
+                        continue
+
+                    added_dates.add(date_str)
+
                     orders.append({
-                        "date": f"{d.month}/{d.day}",
+                        "date": date_str,
                         "customer": customer,
                         "product": product,
                         "qty": qty,
@@ -423,8 +485,16 @@ def create_schedule_order(text):
 
                 if current.weekday() in target_days:
 
+                    date_str = f"{current.month}/{current.day}"
+
+                    if date_str in added_dates:
+                        current += timedelta(days=1)
+                        continue
+
+                    added_dates.add(date_str)
+
                     orders.append({
-                        "date": f"{current.month}/{current.day}",
+                        "date": date_str,
                         "customer": customer,
                         "product": product,
                         "qty": qty,
@@ -439,12 +509,29 @@ def create_schedule_order(text):
         if not orders:
             return "❌ 沒有符合日期"
 
+        # ===== 檢查重複 =====
+        rows = sheet.get_all_values()
+
+        exist = {
+            (r[2], r[3], r[4])
+            for r in rows[1:]
+            if len(r) > 11 and r[11] != "已刪除"
+        }
+
+        orders = [
+            o for o in orders
+            if (o["date"], o["customer"], o["product"]) not in exist
+        ]
+
+        if not orders:
+            return "❌ 排程已存在"
+
         count = save_orders_batch(
             orders,
             "SYSTEM"
         )
 
-        return f"✅ 已建立 {count} 筆排程"
+        return f"✅ 已建立 {count} 筆固定排程"
 
     text = text.strip()
 
@@ -471,25 +558,6 @@ def create_schedule_order(text):
 
     customer = parts[0]
 
-    rows = customer_sheet.get_all_values()
-
-    customer_data = None
-
-    for r in rows[1:]:
-        if r[0] == customer:
-            customer_data = r
-            break
-
-    if not customer_data:
-        return "❌ 客戶未設定"
-
-    # 預設值
-    product = customer_data[1]
-
-    qty_match = re.search(r"(\d+(?:\.\d+)?)", customer_data[2])
-    qty = float(qty_match.group(1))
-    unit = parse_unit(customer_data[2])
-    price = float(customer_data[3])
 
     delivery = ""
     note = ""
@@ -585,7 +653,8 @@ def create_schedule_order(text):
     today = datetime.now().date()
 
     if start_next_week:
-        today += timedelta(days=7)
+    # 下週一開始
+        today += timedelta(days=(7 - today.weekday()))
 
     last_day = calendar.monthrange(
         today.year,
@@ -609,8 +678,8 @@ def create_schedule_order(text):
                 "qty": qty,
                 "unit": unit,
                 "price": price,
-                "delivery": "",
-                "note": "固定排程"
+                "delivery": delivery,
+                "note": note if note else "固定排程"
             })
 
         current += timedelta(days=1)
@@ -618,12 +687,28 @@ def create_schedule_order(text):
     if not orders:
         return "❌ 沒有符合日期"
 
+    rows = sheet.get_all_values()
+
+    exist = {
+        (r[2], r[3], r[4])
+        for r in rows[1:]
+        if len(r) > 11 and r[11] != "已刪除"
+    }
+
+    orders = [
+        o for o in orders
+        if (o["date"], o["customer"], o["product"]) not in exist
+    ]
+
+    if not orders:
+        return "❌ 排程已存在"
+
     count = save_orders_batch(
         orders,
         "SYSTEM"
     )
 
-    return f"✅ 已建立 {count} 筆固定排程"
+    return f"✅ 已建立 {count} 筆排程"
 
     
 
@@ -1210,20 +1295,6 @@ def delete_order(text, user_id):
                 delete_batch
             ]]
         )
-
-        deleted += 1
-
-        sheet.update(
-                f"L{i}:O{i}",
-                [[
-                    "已刪除",
-                    datetime.now().strftime(
-                        "%Y-%m-%d %H:%M:%S"
-                    ),
-                    user_id,
-                    delete_batch
-                ]]
-            )
 
         deleted += 1
 
