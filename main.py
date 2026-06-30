@@ -430,8 +430,8 @@ def create_schedule_order(text):
                         "qty": qty,
                         "unit": unit,
                         "price": price,
-                        "delivery": "",
-                        "note": "固定排程"
+                        "delivery": delivery,
+                        "note": note if note else "固定排程"
                     })
 
                 current += timedelta(days=1)
@@ -457,15 +457,94 @@ def create_schedule_order(text):
         text = text.replace("下週開始", "", 1).strip()
 
     m = re.match(
-        r"(\S+)\s+每週([一二三四五六日]+)到貨到月底",
+        r"(.+?)\s+每週([一二三四五六日]+)到貨到月底$",
         text
     )
 
     if not m:
         return "❌ 排程格式錯誤"
 
-    customer = m.group(1)
+    order_text = m.group(1).strip()
     weekdays_text = m.group(2)
+
+    parts = order_text.split()
+
+    customer = parts[0]
+
+    rows = customer_sheet.get_all_values()
+
+    customer_data = None
+
+    for r in rows[1:]:
+        if r[0] == customer:
+            customer_data = r
+            break
+
+    if not customer_data:
+        return "❌ 客戶未設定"
+
+    # 預設值
+    product = customer_data[1]
+
+    qty_match = re.search(r"(\d+(?:\.\d+)?)", customer_data[2])
+    qty = float(qty_match.group(1))
+    unit = parse_unit(customer_data[2])
+    price = float(customer_data[3])
+
+    delivery = ""
+    note = ""
+
+    # 商品
+    if len(parts) >= 2:
+        product = parts[1]
+
+    # 數量
+    for p in parts[2:]:
+
+        m = re.match(r"(\d+(?:\.\d+)?)(.*)", p)
+
+        if m:
+
+            qty = float(m.group(1))
+
+            if m.group(2):
+                unit = parse_unit(m.group(2))
+
+            break
+
+    # 單價
+    for p in parts:
+
+        if p.startswith("@"):
+
+            try:
+                price = float(p[1:])
+            except:
+                pass
+
+    # 配送
+    for d in DELIVERY_LIST:
+
+        if d in order_text:
+
+            delivery = d
+            break
+
+    # 備註
+    note = order_text
+
+    note = note.replace(customer, "", 1)
+
+    if product:
+        note = note.replace(product, "", 1)
+
+    note = re.sub(r"\d+(?:\.\d+)?[^\s]*", "", note)
+    note = re.sub(r"@\d+(?:\.\d+)?", "", note)
+
+    if delivery:
+        note = note.replace(delivery, "")
+
+    note = note.strip()
 
     weekday_map = {
         "一":0,
