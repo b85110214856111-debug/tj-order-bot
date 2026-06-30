@@ -571,7 +571,8 @@ def create_schedule_order(text):
     # 商品
     if len(parts) >= 2:
         product = parts[1]
-
+    else:
+        product = customer_data[1]
     # 數量
     for p in parts[2:]:
 
@@ -587,7 +588,6 @@ def create_schedule_order(text):
             break
 
     # 單價
-    price = float(customer_data[3])
 
     for p in parts:
 
@@ -664,6 +664,9 @@ def create_schedule_order(text):
 
     if not customer_data:
         return "❌ 客戶未設定"
+
+    # 單價預設使用客戶設定
+    price = float(customer_data[3])
 
     product = customer_data[1]
 
