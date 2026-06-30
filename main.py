@@ -297,6 +297,8 @@ from datetime import timedelta
 import calendar
 
 def create_schedule_order(text):
+    added_dates = set()
+    orders = []
 
     lines = [
         x.strip()
@@ -404,8 +406,9 @@ def create_schedule_order(text):
 
         today = datetime.now().date()
 
-        orders = []
-        added_dates = set()
+        
+       
+        
 
         # 下週四、五到貨
 
@@ -426,7 +429,7 @@ def create_schedule_order(text):
 
             next_week_start = today + timedelta(days=7)
 
-            added_dates = set()
+            
 
             for i in range(7):
 
@@ -584,6 +587,8 @@ def create_schedule_order(text):
             break
 
     # 單價
+    price = float(customer_data[3])
+
     for p in parts:
 
         if p.startswith("@"):
@@ -594,10 +599,11 @@ def create_schedule_order(text):
                 pass
 
     # 配送
+    delivery = ""
+
     for d in DELIVERY_LIST:
 
         if d in order_text:
-
             delivery = d
             break
 
@@ -609,11 +615,25 @@ def create_schedule_order(text):
     if product:
         note = note.replace(product, "", 1)
 
-    note = re.sub(r"\d+(?:\.\d+)?[^\s]*", "", note)
-    note = re.sub(r"@\d+(?:\.\d+)?", "", note)
+    note = re.sub(
+        r"\d+(?:\.\d+)?[^\s]*",
+        "",
+        note
+    )
 
-    if delivery:
-        note = note.replace(delivery, "")
+    note = re.sub(
+        r"@\d+(?:\.\d+)?",
+        "",
+        note
+    )
+
+    for d in DELIVERY_LIST:
+        note = note.replace(d, "")
+
+    note = note.replace(
+        "每週二到貨到月底",
+        ""
+    )
 
     note = note.strip()
 
