@@ -1062,7 +1062,11 @@ def delete_order(text, user_id):
         return f"✅ 已刪除 {deleted} 筆訂單" if deleted else "❌ 找不到訂單"
 
     dates = [x for x in parts[1:] if re.match(r"\d{1,2}/\d{1,2}", x)]
-    customers = [x for x in parts[1:] if not re.match(r"\d{1,2}/\d{1,2}", x)]
+
+    others = [x for x in parts[1:] if not re.match(r"\d{1,2}/\d{1,2}", x)]
+
+    customer = others[0] if len(others) >= 1 else ""
+    product = others[1] if len(others) >= 2 else ""
 
 # 不允許只輸入客戶
     if not dates:
@@ -1099,7 +1103,6 @@ def delete_order(text, user_id):
 # 日期 + 客戶
 
     target_date = dates[0]
-    target_customer = customers[0]
 
     for i in range(len(rows), 1, -1):
 
@@ -1110,15 +1113,28 @@ def delete_order(text, user_id):
         if status == "已刪除":
             continue
 
-        sheet_date = r[2].strip()
-        sheet_customer = r[3].strip()
+        if r[2] != target_date:
+            continue
 
-        if (
-            sheet_date in dates
-            and sheet_customer == target_customer
-        ):
+        if customer and r[3] != customer:
+            continue
 
-            sheet.update(
+        if product and r[4] != product:
+            continue
+
+        sheet.update(
+            f"L{i}:O{i}",
+            [[
+                "已刪除",
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                user_id,
+                delete_batch
+            ]]
+        )
+
+        deleted += 1
+
+        sheet.update(
                 f"L{i}:O{i}",
                 [[
                     "已刪除",
@@ -1130,7 +1146,7 @@ def delete_order(text, user_id):
                 ]]
             )
 
-            deleted += 1
+        deleted += 1
 
     return f"✅ 已刪除 {deleted} 筆訂單" if deleted else "❌ 找不到訂單"
 
@@ -1183,10 +1199,13 @@ def restore_order(text):
         if re.match(r"\d{1,2}/\d{1,2}", x)
     ]
 
-    customers = [
+    others = [
         x for x in parts[1:]
         if not re.match(r"\d{1,2}/\d{1,2}", x)
     ]
+
+    customer = others[0] if len(others) >= 1 else ""
+    product = others[1] if len(others) >= 2 else ""
 
     if not dates:
         return "❌ 僅支援：復原 單號、復原 日期、復原 日期 客戶"
@@ -1229,7 +1248,9 @@ def restore_order(text):
     
     # 日期 + 客戶
 
-    target_customer = customers[0]
+    # 日期 + 客戶 (+ 商品)
+
+    target_date = dates[0]
 
     for i, r in enumerate(rows[1:], start=2):
 
@@ -1238,25 +1259,26 @@ def restore_order(text):
         if status != "已刪除":
             continue
 
-        sheet_date = r[2].strip()
-        sheet_customer = r[3].strip()
+        if r[2].strip() != target_date:
+            continue
 
-        if (
-            sheet_date in dates
-            and sheet_customer == target_customer
-        ):
+        if customer and r[3].strip() != customer:
+            continue
 
-            sheet.update(
-                f"L{i}:O{i}",
-                [[
-                    "正常",
-                    "",
-                    "",
-                    ""
-                ]]
-            )
+        if product and r[4].strip() != product:
+            continue
 
-            restored += 1
+        sheet.update(
+            f"L{i}:O{i}",
+            [[
+                "正常",
+                "",
+                "",
+                ""
+            ]]
+        )
+
+        restored += 1
 
     return (
         f"✅ 已復原 {restored} 筆訂單"
