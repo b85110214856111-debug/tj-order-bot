@@ -1073,7 +1073,7 @@ def delete_order(text, user_id):
         return "❌ 僅支援：刪單 單號、刪單 日期、刪單 日期 客戶"
 
 # 日期
-    if dates and not customers:
+    if dates and not customer:
 
         for i in range(len(rows), 1, -1):
 
