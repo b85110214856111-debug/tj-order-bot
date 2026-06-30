@@ -564,7 +564,7 @@ def edit_order(text):
     text = text.replace("\n", " ").strip()
 
     m = re.match(
-        r"改單\s+(.+?)\s+(日期|商品|數量|單價|配送|備註)\s+(.+)",
+        r"改單\s+(.+?)\s+(日期|商品|數量|單價|配送|備註)\s+(.+)$",
         text
     )
 
@@ -586,8 +586,11 @@ def edit_order(text):
     )
 
     customer = ""
+    product = ""
 
     tokens = target_text.split()
+
+    normal = []
 
     for t in tokens:
 
@@ -597,8 +600,13 @@ def edit_order(text):
         if re.match(r"\d{9,}", t):
             continue
 
-        customer = t
-        break
+        normal.append(t)
+
+    if len(normal) >= 1:
+        customer = normal[0]
+
+    if len(normal) >= 2:
+        product = normal[1]
 
     qty = None
     unit = ""
@@ -672,10 +680,11 @@ def edit_order(text):
             if r[2] not in dates:
                 continue
 
-            if customer:
+            if customer and r[3] != customer:
+                continue
 
-                if r[3] != customer:
-                    continue
+            if product and r[4] != product:
+                continue
 
             match = True
 
