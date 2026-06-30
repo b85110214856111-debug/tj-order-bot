@@ -1213,7 +1213,7 @@ def restore_order(text):
     # 日期
    # 日期
 
-    if dates and not customers:
+    if dates and not customer:
 
         for i in range(len(rows), 1, -1):
 
