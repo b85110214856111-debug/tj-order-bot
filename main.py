@@ -8,8 +8,6 @@ from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse
 from dotenv import load_dotenv
 from openpyxl import Workbook
-from openpyxl import load_workbook
-from openpyxl.drawing.image import Image
 from fastapi.responses import FileResponse
 import gspread
 from google.oauth2.service_account import Credentials
@@ -46,72 +44,9 @@ cloudinary.config(
 import uuid
 
 from io import BytesIO
-
-def save_line_image(message_id, user_name):
-    content = line_bot_api.get_message_content(message_id)
-
-    folder = "line_images"
-    if not os.path.exists(folder):
-        os.makedirs(folder)
-
-    date_str = datetime.now().strftime("%Y-%m-%d")
-    time_str = datetime.now().strftime("%H%M%S")
-
-    img_path = f"{folder}/{date_str}_{message_id}.jpg"
-
-    with open(img_path, "wb") as f:
-        for chunk in content.iter_content():
-            f.write(chunk)
-
-    # 建 Excel（每天一份紀錄）
-    excel_path = f"{folder}/{date_str}.xlsx"
-
-    if os.path.exists(excel_path):
-        wb = load_workbook(excel_path)
-        ws = wb.active
-    else:
-        wb = Workbook()
-        ws = wb.active
-        ws.title = date_str
-        ws.append(["時間", "使用者", "圖片"])
-
-    img = Image(img_path)
-    img.width = 200
-    img.height = 200
-
-    row = ws.max_row + 1
-
-    ws.append([
-        datetime.now().strftime("%H:%M:%S"),
-        user_name,
-        ""
-    ])
-
-    ws.add_image(img, f"C{row}")
-
-    wb.save(excel_path)
-
-    return img_path
-
-def get_today_image_sheet():
-    date_str = datetime.now().strftime("%Y-%m-%d")
-    folder = "line_images"
-
-    if not os.path.exists(folder):
-        os.makedirs(folder)
-
-    path = f"{folder}/{date_str}.xlsx"
-
-    if os.path.exists(path):
-        wb = load_workbook(path)
-        ws = wb.active
-    else:
-        wb = Workbook()
-        ws = wb.active
-        ws.title = date_str
-        ws.append(["時間", "使用者", "圖片"])
-
-    return wb, ws, path
+from openpyxl.drawing.image import Image as ExcelImage
+from PIL import Image
+import requests
 
 def upload_excel_file(wb):
 
@@ -149,6 +84,36 @@ def upload_excel_file(wb):
 
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
+
+def save_photo(public_id, user):
+
+    photo_sheet.append_row([
+        datetime.now().strftime("%Y/%m/%d"),
+        datetime.now().strftime("%H:%M:%S"),
+        user,
+        public_id
+    ])
+
+def download_cloudinary_image(public_id):
+
+    url = cloudinary.CloudinaryImage(
+        public_id
+    ).build_url()
+
+    r = requests.get(url)
+
+    if r.status_code != 200:
+        return None
+
+    tmp = tempfile.NamedTemporaryFile(
+        suffix=".jpg",
+        delete=False
+    )
+
+    tmp.write(r.content)
+    tmp.close()
+
+    return tmp.name
 
 import json
 
@@ -196,6 +161,24 @@ def init_sheets():
 
     raise Exception("Google Sheet無法連線")
 sheet, customer_sheet, settings_sheet = init_sheets()
+
+book = gc.open_by_key(SHEET_ID)
+
+try:
+    photo_sheet = book.worksheet("Photos")
+except:
+    photo_sheet = book.add_worksheet(
+        title="Photos",
+        rows=5000,
+        cols=10
+    )
+
+    photo_sheet.append_row([
+        "日期",
+        "時間",
+        "User",
+        "PublicID"
+    ])
 DELIVERY_LIST = ["自取","自送","代送","業務自送","寄大榮","寄黑貓","寄順豐","寄梓華榮"]
 
 
@@ -204,12 +187,25 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
     rows = sheet.get_all_values()
 
     wb = Workbook()
-    ws = wb.active
 
+    # 第一個工作表
+    ws = wb.active
     ws.title = "Orders"
 
-    img_ws = wb.create_sheet("Images")
-    img_ws.append(["時間", "使用者", "圖片"])
+    # 第二個工作表
+    photo_ws = wb.create_sheet("LINE Photos")
+
+    photo_ws.append([
+        "日期",
+        "時間",
+        "傳送者",
+        "照片"
+    ])
+
+    photo_ws.column_dimensions["A"].width = 15
+    photo_ws.column_dimensions["B"].width = 12
+    photo_ws.column_dimensions["C"].width = 20
+    photo_ws.column_dimensions["D"].width = 35
 
     ws.append([
         "單號",
@@ -317,37 +313,51 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
             unit,
             total_qty
         ])
-    img_ws = wb.create_sheet("Images")
-    img_ws.append(["時間", "使用者", "圖片"])
+    # ==========================
+    # 匯出照片
+    # ==========================
 
-    img_path = f"line_images/{datetime.now().strftime('%Y-%m-%d')}.xlsx"
+    photos = photo_sheet.get_all_values()
 
-    if os.path.exists(img_path):
-        img_wb = load_workbook(img_path)
-        img_ws_src = img_wb.active
+    row = 2
 
-        for i in range(2, img_ws_src.max_row + 1):
-            time = img_ws_src[f"A{i}"].value
-            user = img_ws_src[f"B{i}"].value
+    for p in photos[1:]:
 
-            new_row = img_ws.max_row + 1
+        if len(p) < 4:
+            continue
 
-            img_ws.append([time, user, ""])
+        photo_ws.cell(row=row, column=1).value = p[0]
+        photo_ws.cell(row=row, column=2).value = p[1]
+        photo_ws.cell(row=row, column=3).value = p[2]
 
-            # 找對應圖片檔（正確方式）
-            date_prefix = datetime.now().strftime("%Y-%m-%d")
+        try:
 
-            img_file = None
-            for f in os.listdir("line_images"):
-                if f.startswith(date_prefix) and f.endswith(".jpg"):
-                    img_file = os.path.join("line_images", f)
-                    break
+            img_path = download_cloudinary_image(
+                p[3]
+            )
 
-            if img_file:
-                img = Image(img_file)
-                img.width = 200
-                img.height = 200
-                img_ws.add_image(img, f"C{new_row}")
+            if img_path:
+
+                excel_img = ExcelImage(img_path)
+
+                excel_img.width = 180
+                excel_img.height = 135
+
+                photo_ws.add_image(
+                    excel_img,
+                    f"D{row}"
+                )
+
+                photo_ws.row_dimensions[row].height = 110
+
+                os.remove(img_path)
+
+        except Exception as e:
+
+            print(e)
+
+        row += 1
+
     return upload_excel_file(wb)
 
 
@@ -1760,16 +1770,61 @@ async def callback(request: Request):
 
     for event in body["events"]:
 
-        message = event["message"]
-
-        if message["type"] == "image":
-            save_line_image(message["id"], user_name)
+        if event["type"] != "message":
             continue
 
-        if message["type"] != "text":
+        user_id = event["source"]["userId"]
+        user_name = get_user_name(user_id)
+
+        # ==========================
+        # 接收圖片
+        # ==========================
+        if event["message"]["type"] == "image":
+
+            message_id = event["message"]["id"]
+
+            content = line_bot_api.get_message_content(
+                message_id
+            )
+
+            with tempfile.NamedTemporaryFile(
+                suffix=".jpg",
+                delete=False
+            ) as tmp:
+
+                for chunk in content.iter_content():
+                    tmp.write(chunk)
+
+                tmp_path = tmp.name
+
+            result = cloudinary.uploader.upload(
+                tmp_path,
+                folder="line_photos"
+            )
+
+            os.remove(tmp_path)
+
+            public_id = result["public_id"]
+
+            save_photo(
+                public_id,
+                user_name
+            )
+
+            line_bot_api.reply_message(
+                event["replyToken"],
+                TextSendMessage(
+                    text="✅ 圖片已自動保存"
+                )
+            )
+
             continue
 
-        text = message["text"]
+        # ==========================
+        # 文字訊息
+        # ==========================
+
+        text = event["message"]["text"]
 
     # ===== 移除 LINE Mention =====
 
