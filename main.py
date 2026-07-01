@@ -715,16 +715,15 @@ def create_schedule_order(text):
         product = customer_data[1]
 
 
-    # 記住輸入值
     input_qty = qty
     input_unit = unit
     input_price = price
 
 
     # 預設
-    qty = 0
-    unit = ""
-    price = 0
+    qty = None
+    unit = None
+    price = None
 
 
     # 比對 Customers 同客戶+同商品
@@ -753,39 +752,15 @@ def create_schedule_order(text):
 
 
     # 輸入優先覆蓋
-    if input_qty:
+    # 輸入優先覆蓋
+    if input_qty is not None:
         qty = input_qty
+
+    if input_unit:
         unit = input_unit
 
-    if input_price:
+    if input_price is not None:
         price = input_price
-
-
-        # 找同客戶 + 同商品
-        # 找同客戶 + 同商品
-
-        for r in rows[1:]:
-
-            if len(r) < 4:
-                continue
-
-            if r[0] == customer and r[1] == product:
-
-                qty_match = re.search(
-                    r"(\d+(?:\.\d+)?)",
-                    r[2]
-                )
-
-                if qty_match:
-                    qty = float(qty_match.group(1))
-                    unit = parse_unit(r[2])
-
-                try:
-                    price = float(r[3])
-                except:
-                    price = 0
-
-                break
 
     today = datetime.now().date()
 
