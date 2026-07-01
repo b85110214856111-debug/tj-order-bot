@@ -350,7 +350,7 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
 
                 photo_ws.row_dimensions[row].height = 110
 
-                os.remove(img_path)
+                # 不要刪
 
         except Exception as e:
 
