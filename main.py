@@ -753,13 +753,15 @@ def create_schedule_order(text):
 
     # 輸入優先覆蓋
     # 輸入優先覆蓋
+    # 輸入有值才覆蓋，沒有就用基本檔
+
     if input_qty is not None:
         qty = input_qty
 
     if input_unit:
         unit = input_unit
 
-    if input_price is not None:
+    if input_price and input_price > 0:
         price = input_price
 
     today = datetime.now().date()
