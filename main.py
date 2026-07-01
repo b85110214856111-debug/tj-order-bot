@@ -10,6 +10,11 @@ from dotenv import load_dotenv
 from openpyxl import Workbook
 from fastapi.responses import FileResponse
 import gspread
+
+import zipfile
+import shutil
+import tempfile
+
 from google.oauth2.service_account import Credentials
 from linebot import LineBotApi
 from linebot.models import TextSendMessage
@@ -81,6 +86,68 @@ def upload_excel_file(wb):
 
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
+
+def upload_zip_file(excel_path, image_folder):
+
+    zip_name = f"orders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+
+    tmp_zip = None
+
+    try:
+
+        with tempfile.NamedTemporaryFile(
+            suffix=".zip",
+            delete=False
+        ) as tmp:
+
+            tmp_zip = tmp.name
+
+        with zipfile.ZipFile(
+            tmp_zip,
+            "w",
+            zipfile.ZIP_DEFLATED
+        ) as zipf:
+
+            # Excel
+            zipf.write(
+                excel_path,
+                arcname="訂單.xlsx"
+            )
+
+            # 圖片
+            if os.path.exists(image_folder):
+
+                for file in os.listdir(image_folder):
+
+                    full = os.path.join(
+                        image_folder,
+                        file
+                    )
+
+                    if os.path.isfile(full):
+
+                        zipf.write(
+                            full,
+                            arcname=file
+                        )
+
+        result = cloudinary.uploader.upload(
+            tmp_zip,
+            resource_type="raw",
+            folder="order_exports",
+            public_id=zip_name.replace(
+                ".zip",
+                ""
+            ),
+            overwrite=True
+        )
+
+        return result["secure_url"]
+
+    finally:
+
+        if tmp_zip and os.path.exists(tmp_zip):
+            os.remove(tmp_zip)
 
 import json
 
@@ -246,7 +313,35 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
             unit,
             total_qty
         ])
-    return upload_excel_file(wb)
+    with tempfile.NamedTemporaryFile(
+        suffix=".xlsx",
+        delete=False
+    ) as tmp:
+
+        excel_path = tmp.name
+
+    wb.save(excel_path)
+
+    # 找圖片資料夾
+    folder = ""
+
+    if start_date:
+
+        m, d = map(int, start_date.split("/"))
+
+        folder = os.path.join(
+            "uploads",
+            f"{m:02d}{d:02d}"
+        )
+
+    url = upload_zip_file(
+        excel_path,
+        folder
+    )
+
+    os.remove(excel_path)
+
+    return url
 
 
 
@@ -1106,6 +1201,25 @@ def generate_order_ids(count):
 def generate_order_id():
     return generate_order_ids(1)[0]
 
+
+def save_line_image(event):
+
+    message_id = event["message"]["id"]
+
+    today = datetime.now().strftime("%m%d")
+
+    folder = os.path.join("uploads", today)
+
+    os.makedirs(folder, exist_ok=True)
+
+    content = line_bot_api.get_message_content(message_id)
+
+    filename = os.path.join(folder, f"{message_id}.jpg")
+
+    with open(filename, "wb") as f:
+        for chunk in content.iter_content():
+            f.write(chunk)
+
 def save_order(data, user_id):
 
     oid = generate_order_ids(1)[0]
@@ -1659,6 +1773,12 @@ async def callback(request: Request):
     for event in body["events"]:
 
         if event["type"] != "message":
+            continue
+
+        msg_type = event["message"]["type"]
+
+        if msg_type == "image":
+            save_line_image(event)
             continue
 
         text = event["message"]["text"]
