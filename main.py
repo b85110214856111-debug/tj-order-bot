@@ -571,19 +571,12 @@ def create_schedule_order(text):
     delivery = ""
     note = ""
 
-    # 商品
+    # 商品先判斷
     product = None
 
     if len(parts) >= 2:
-
-    # 第二個詞如果是配送，就表示沒輸入商品
-        if parts[1] in DELIVERY_LIST:
-            product = customer_data[1]
-        else:
+        if parts[1] not in DELIVERY_LIST:
             product = parts[1]
-
-    else:
-        product = customer_data[1]
     # 數量
     for p in parts[1:]:
 
@@ -679,12 +672,11 @@ def create_schedule_order(text):
     if not customer_data:
         return "❌ 客戶未設定"
 
-    # 單價預設使用客戶設定
     # 商品：輸入優先，沒有才用客戶設定
     if not product:
         product = customer_data[1]
 
-# 數量：輸入優先
+    # 數量：輸入優先
     if qty is None:
         qty_match = re.search(
             r"(\d+(?:\.\d+)?)",
