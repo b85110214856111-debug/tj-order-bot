@@ -131,7 +131,7 @@ sheet, customer_sheet, settings_sheet = init_sheets()
 DELIVERY_LIST = ["自取","自送","代送","業務自送","寄大榮","寄黑貓","寄順豐","寄梓華榮"]
 
 
-def export_orders(keyword):
+def export_orders(keyword="全部", start_date=None, end_date=None):
 
     rows = sheet.get_all_values()
 
@@ -164,6 +164,26 @@ def export_orders(keyword):
         if status == "已刪除":
             continue
 
+        # 日期區間
+        if start_date and end_date:
+
+            try:
+                month, day = map(int, r[2].split("/"))
+                order_num = month * 100 + day
+
+                sm, sd = map(int, start_date.split("/"))
+                em, ed = map(int, end_date.split("/"))
+
+                start_num = sm * 100 + sd
+                end_num = em * 100 + ed
+
+                if order_num < start_num or order_num > end_num:
+                    continue
+
+            except:
+                continue
+
+        # 關鍵字(客戶)
         if keyword != "全部":
 
             if keyword not in " ".join(r):
@@ -1706,15 +1726,35 @@ async def callback(request: Request):
 
             elif cmd.startswith("匯出"):
 
-                keyword = cmd.replace(
-                    "匯出",
-                    ""
-                ).strip()
+                text = cmd.replace("匯出", "").strip()
 
-                if not keyword:
-                    keyword = "全部"
+                keyword = "全部"
+                start_date = None
+                end_date = None
 
-                url = export_orders(keyword)
+                m = re.match(
+                    r"(\d{1,2}/\d{1,2})\s*[~-]\s*(\d{1,2}/\d{1,2})(?:\s+(.*))?$",
+                    text
+                )
+
+                if m:
+
+                    start_date = m.group(1)
+                    end_date = m.group(2)
+
+                    if m.group(3):
+                        keyword = m.group(3).strip()
+
+                else:
+
+                    if text:
+                        keyword = text
+
+                url = export_orders(
+                    keyword,
+                    start_date,
+                    end_date
+                )
 
                 if not url:
                     results.append(
