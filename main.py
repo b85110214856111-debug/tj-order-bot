@@ -89,9 +89,6 @@ def upload_excel_file(wb):
 
 def upload_zip_file(excel_path, image_folder):
 
-    print("ZIP:", tmp_zip)
-    print("ZIP SIZE:", os.path.getsize(tmp_zip))
-
     zip_name = f"orders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
 
     tmp_zip = None
@@ -111,29 +108,18 @@ def upload_zip_file(excel_path, image_folder):
             zipfile.ZIP_DEFLATED
         ) as zipf:
 
-            # Excel
             if os.path.getsize(excel_path) > 0:
-                zipf.write(
-                    excel_path,
-                    arcname="訂單.xlsx"
-                )
+                zipf.write(excel_path, arcname="訂單.xlsx")
 
-            # 圖片
             if os.path.exists(image_folder):
-
                 for file in os.listdir(image_folder):
-
-                    full = os.path.join(
-                        image_folder,
-                        file
-                    )
-
+                    full = os.path.join(image_folder, file)
                     if os.path.isfile(full):
+                        zipf.write(full, arcname=file)
 
-                        zipf.write(
-                            full,
-                            arcname=file
-                        )
+        # ZIP 建立完成後再印
+        print("ZIP:", tmp_zip)
+        print("ZIP SIZE:", os.path.getsize(tmp_zip))
 
         result = cloudinary.uploader.upload(
             tmp_zip,
@@ -145,7 +131,9 @@ def upload_zip_file(excel_path, image_folder):
             unique_filename=False
         )
 
-        return result["secure_url"]
+        print(result)
+
+        return result["secure_url"] + "?fl_attachment=1"
 
     finally:
 
