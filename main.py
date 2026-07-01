@@ -672,22 +672,47 @@ def create_schedule_order(text):
     if not customer_data:
         return "❌ 客戶未設定"
 
-    # 商品：輸入優先，沒有才用客戶設定
+
+    # =====================
+    # 商品比對 Customers 基本檔
+    # =====================
+
     if not product:
         product = customer_data[1]
 
-    # 數量：輸入優先
-    if qty is None:
-        qty_match = re.search(
-            r"(\d+(?:\.\d+)?)",
-            customer_data[2]
-        )
+
+    # 預設 0
+    qty = 0
+    unit = ""
+    price = 0
+
+
+    # 找同客戶 + 同商品
+    for r in rows[1:]:
+
+        if len(r) < 4:
+            continue
+
+        if r[0] == customer and r[1] == product:
+
+            qty_match = re.search(
+                r"(\d+(?:\.\d+)?)",
+                r[2]
+            )
+
+            if qty_match:
+                qty = float(qty_match.group(1))
+                unit = parse_unit(r[2])
+
+            try:
+                price = float(r[3])
+            except:
+                price = 0
+
+            break
+
         qty = float(qty_match.group(1))
         unit = parse_unit(customer_data[2])
-
-# 單價：輸入優先，沒有才用客戶設定
-    if "price" not in locals() or price == 0:
-        price = float(customer_data[3])
 
     today = datetime.now().date()
 
