@@ -50,15 +50,32 @@ from io import BytesIO
 def save_line_image(message_id, user_name):
     content = line_bot_api.get_message_content(message_id)
 
-    temp_path = f"temp_{message_id}.jpg"
+    folder = "line_images"
+    if not os.path.exists(folder):
+        os.makedirs(folder)
 
-    with open(temp_path, "wb") as f:
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    time_str = datetime.now().strftime("%H%M%S")
+
+    img_path = f"{folder}/{date_str}_{message_id}.jpg"
+
+    with open(img_path, "wb") as f:
         for chunk in content.iter_content():
             f.write(chunk)
 
-    wb, ws, path = get_today_image_sheet()
+    # 建 Excel（每天一份紀錄）
+    excel_path = f"{folder}/{date_str}.xlsx"
 
-    img = Image(temp_path)
+    if os.path.exists(excel_path):
+        wb = load_workbook(excel_path)
+        ws = wb.active
+    else:
+        wb = Workbook()
+        ws = wb.active
+        ws.title = date_str
+        ws.append(["時間", "使用者", "圖片"])
+
+    img = Image(img_path)
     img.width = 200
     img.height = 200
 
@@ -72,9 +89,9 @@ def save_line_image(message_id, user_name):
 
     ws.add_image(img, f"C{row}")
 
-    wb.save(path)
+    wb.save(excel_path)
 
-    os.remove(temp_path)
+    return img_path
 
 def get_today_image_sheet():
     date_str = datetime.now().strftime("%Y-%m-%d")
@@ -300,28 +317,37 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
             unit,
             total_qty
         ])
+    img_ws = wb.create_sheet("Images")
+    img_ws.append(["時間", "使用者", "圖片"])
+
     img_path = f"line_images/{datetime.now().strftime('%Y-%m-%d')}.xlsx"
 
     if os.path.exists(img_path):
         img_wb = load_workbook(img_path)
-        img_src = img_wb.active
+        img_ws_src = img_wb.active
 
-        for img in img_src._images:
-            anchor = img.anchor._from
-            row = anchor.row + 1
-
-            time = img_src[f"A{row}"].value
-            user = img_src[f"B{row}"].value
+        for i in range(2, img_ws_src.max_row + 1):
+            time = img_ws_src[f"A{i}"].value
+            user = img_ws_src[f"B{i}"].value
 
             new_row = img_ws.max_row + 1
 
             img_ws.append([time, user, ""])
 
-            new_img = Image(img.ref)
-            new_img.width = 200
-            new_img.height = 200
+            # 找對應圖片檔（正確方式）
+            date_prefix = datetime.now().strftime("%Y-%m-%d")
 
-            img_ws.add_image(new_img, f"C{new_row}")
+            img_file = None
+            for f in os.listdir("line_images"):
+                if f.startswith(date_prefix) and f.endswith(".jpg"):
+                    img_file = os.path.join("line_images", f)
+                    break
+
+            if img_file:
+                img = Image(img_file)
+                img.width = 200
+                img.height = 200
+                img_ws.add_image(img, f"C{new_row}")
     return upload_excel_file(wb)
 
 
