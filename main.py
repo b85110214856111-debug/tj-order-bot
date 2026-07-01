@@ -89,6 +89,9 @@ def upload_excel_file(wb):
 
 def upload_zip_file(excel_path, image_folder):
 
+    print("ZIP:", tmp_zip)
+    print("ZIP SIZE:", os.path.getsize(tmp_zip))
+
     zip_name = f"orders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
 
     tmp_zip = None
@@ -109,10 +112,11 @@ def upload_zip_file(excel_path, image_folder):
         ) as zipf:
 
             # Excel
-            zipf.write(
-                excel_path,
-                arcname="訂單.xlsx"
-            )
+            if os.path.getsize(excel_path) > 0:
+                zipf.write(
+                    excel_path,
+                    arcname="訂單.xlsx"
+                )
 
             # 圖片
             if os.path.exists(image_folder):
@@ -135,11 +139,10 @@ def upload_zip_file(excel_path, image_folder):
             tmp_zip,
             resource_type="raw",
             folder="order_exports",
-            public_id=zip_name.replace(
-                ".zip",
-                ""
-            ),
-            overwrite=True
+            public_id=zip_name.replace(".zip", ""),
+            overwrite=True,
+            use_filename=True,
+            unique_filename=False
         )
 
         return result["secure_url"]
@@ -321,6 +324,7 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
         excel_path = tmp.name
 
     wb.save(excel_path)
+    wb.close()
 
     # 找圖片資料夾
     folder = ""
