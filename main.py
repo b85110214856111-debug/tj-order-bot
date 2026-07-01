@@ -34,6 +34,9 @@ import cloudinary
 import cloudinary.uploader
 import tempfile
 
+import zipfile
+import shutil
+
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
     api_key=os.getenv("CLOUDINARY_API_KEY"),
@@ -84,6 +87,20 @@ def upload_excel_file(wb):
 
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
+
+def upload_file(file_path):
+
+    filename = os.path.basename(file_path)
+
+    result = cloudinary.uploader.upload(
+        file_path,
+        resource_type="raw",
+        folder="photo_exports",
+        public_id=filename.replace(".zip", ""),
+        overwrite=True
+    )
+
+    return result["secure_url"]
 
 def save_photo(public_id, user):
 
@@ -361,7 +378,61 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
     return upload_excel_file(wb)
 
 
+def export_photos():
 
+    photos = photo_sheet.get_all_values()
+
+    folder = tempfile.mkdtemp(prefix="photos_")
+
+    for p in photos[1:]:
+
+        if len(p) < 4:
+            continue
+
+        date = p[0]
+        time = p[1]
+        user = p[2]
+        public_id = p[3]
+
+        url = cloudinary.CloudinaryImage(public_id).build_url()
+
+        r = requests.get(url)
+
+        if r.status_code != 200:
+            continue
+
+        filename = f"{date}_{time}_{user}.jpg"
+
+        filename = filename.replace("/", "-").replace(":", "-")
+
+        with open(os.path.join(folder, filename), "wb") as f:
+            f.write(r.content)
+
+    zip_path = os.path.join(
+        tempfile.gettempdir(),
+        "LINE_Photos.zip"
+    )
+
+    with zipfile.ZipFile(
+        zip_path,
+        "w",
+        zipfile.ZIP_DEFLATED
+    ) as z:
+
+        for file in os.listdir(folder):
+
+            z.write(
+                os.path.join(folder, file),
+                arcname=file
+            )
+
+    shutil.rmtree(folder)
+
+    url = upload_file(zip_path)
+
+    os.remove(zip_path)
+
+    return url
 
 def get_user_name(user_id):
 
@@ -1913,21 +1984,21 @@ async def callback(request: Request):
                     if text:
                         keyword = text
 
-                url = export_orders(
+                excel_url = export_orders(
                     keyword,
                     start_date,
                     end_date
                 )
 
-                if not url:
-                    results.append(
-                        "❌ 找不到資料"
-                    )
-                
-                else:
-                    results.append(
-                        f"✅ Excel匯出完成\n{url}"
-                    )
+                photo_url = export_photos(
+                    start_date,
+                    end_date
+                )
+
+                results.append(f"📄 訂單 Excel：\n{excel_url}")
+                results.append(f"📷 照片 ZIP：\n{photo_url}")
+
+                continue              
 
             elif cmd.startswith("刪單"):
 
