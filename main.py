@@ -8,13 +8,10 @@ from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse
 from dotenv import load_dotenv
 from openpyxl import Workbook
+from openpyxl import load_workbook
+from openpyxl.drawing.image import Image
 from fastapi.responses import FileResponse
 import gspread
-
-import zipfile
-import shutil
-import tempfile
-
 from google.oauth2.service_account import Credentials
 from linebot import LineBotApi
 from linebot.models import TextSendMessage
@@ -49,6 +46,55 @@ cloudinary.config(
 import uuid
 
 from io import BytesIO
+
+def save_line_image(message_id, user_name):
+    content = line_bot_api.get_message_content(message_id)
+
+    temp_path = f"temp_{message_id}.jpg"
+
+    with open(temp_path, "wb") as f:
+        for chunk in content.iter_content():
+            f.write(chunk)
+
+    wb, ws, path = get_today_image_sheet()
+
+    img = Image(temp_path)
+    img.width = 200
+    img.height = 200
+
+    row = ws.max_row + 1
+
+    ws.append([
+        datetime.now().strftime("%H:%M:%S"),
+        user_name,
+        ""
+    ])
+
+    ws.add_image(img, f"C{row}")
+
+    wb.save(path)
+
+    os.remove(temp_path)
+
+def get_today_image_sheet():
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    folder = "line_images"
+
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
+    path = f"{folder}/{date_str}.xlsx"
+
+    if os.path.exists(path):
+        wb = load_workbook(path)
+        ws = wb.active
+    else:
+        wb = Workbook()
+        ws = wb.active
+        ws.title = date_str
+        ws.append(["時間", "使用者", "圖片"])
+
+    return wb, ws, path
 
 def upload_excel_file(wb):
 
@@ -86,59 +132,6 @@ def upload_excel_file(wb):
 
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
-
-def upload_zip_file(excel_path, image_folder):
-
-    zip_name = f"orders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
-
-    tmp_zip = None
-
-    try:
-
-        with tempfile.NamedTemporaryFile(
-            suffix=".zip",
-            delete=False
-        ) as tmp:
-
-            tmp_zip = tmp.name
-
-        with zipfile.ZipFile(
-            tmp_zip,
-            "w",
-            zipfile.ZIP_DEFLATED
-        ) as zipf:
-
-            if os.path.getsize(excel_path) > 0:
-                zipf.write(excel_path, arcname="訂單.xlsx")
-
-            if os.path.exists(image_folder):
-                for file in os.listdir(image_folder):
-                    full = os.path.join(image_folder, file)
-                    if os.path.isfile(full):
-                        zipf.write(full, arcname=file)
-
-        # ZIP 建立完成後再印
-        print("ZIP:", tmp_zip)
-        print("ZIP SIZE:", os.path.getsize(tmp_zip))
-
-        result = cloudinary.uploader.upload(
-            tmp_zip,
-            resource_type="raw",
-            folder="order_exports",
-            public_id=zip_name.replace(".zip", ""),
-            overwrite=True,
-            use_filename=True,
-            unique_filename=False
-        )
-
-        print(result)
-
-        return result["secure_url"] + "?fl_attachment=1"
-
-    finally:
-
-        if tmp_zip and os.path.exists(tmp_zip):
-            os.remove(tmp_zip)
 
 import json
 
@@ -197,6 +190,9 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
     ws = wb.active
 
     ws.title = "Orders"
+
+    img_ws = wb.create_sheet("Images")
+    img_ws.append(["時間", "使用者", "圖片"])
 
     ws.append([
         "單號",
@@ -304,36 +300,29 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
             unit,
             total_qty
         ])
-    with tempfile.NamedTemporaryFile(
-        suffix=".xlsx",
-        delete=False
-    ) as tmp:
+    img_path = f"line_images/{datetime.now().strftime('%Y-%m-%d')}.xlsx"
 
-        excel_path = tmp.name
+    if os.path.exists(img_path):
+        img_wb = load_workbook(img_path)
+        img_src = img_wb.active
 
-    wb.save(excel_path)
-    wb.close()
+        for img in img_src._images:
+            anchor = img.anchor._from
+            row = anchor.row + 1
 
-    # 找圖片資料夾
-    folder = ""
+            time = img_src[f"A{row}"].value
+            user = img_src[f"B{row}"].value
 
-    if start_date:
+            new_row = img_ws.max_row + 1
 
-        m, d = map(int, start_date.split("/"))
+            img_ws.append([time, user, ""])
 
-        folder = os.path.join(
-            "uploads",
-            f"{m:02d}{d:02d}"
-        )
+            new_img = Image(img.ref)
+            new_img.width = 200
+            new_img.height = 200
 
-    url = upload_zip_file(
-        excel_path,
-        folder
-    )
-
-    os.remove(excel_path)
-
-    return url
+            img_ws.add_image(new_img, f"C{new_row}")
+    return upload_excel_file(wb)
 
 
 
@@ -1193,25 +1182,6 @@ def generate_order_ids(count):
 def generate_order_id():
     return generate_order_ids(1)[0]
 
-
-def save_line_image(event):
-
-    message_id = event["message"]["id"]
-
-    today = datetime.now().strftime("%m%d")
-
-    folder = os.path.join("uploads", today)
-
-    os.makedirs(folder, exist_ok=True)
-
-    content = line_bot_api.get_message_content(message_id)
-
-    filename = os.path.join(folder, f"{message_id}.jpg")
-
-    with open(filename, "wb") as f:
-        for chunk in content.iter_content():
-            f.write(chunk)
-
 def save_order(data, user_id):
 
     oid = generate_order_ids(1)[0]
@@ -1764,16 +1734,16 @@ async def callback(request: Request):
 
     for event in body["events"]:
 
-        if event["type"] != "message":
+        message = event["message"]
+
+        if message["type"] == "image":
+            save_line_image(message["id"], user_name)
             continue
 
-        msg_type = event["message"]["type"]
-
-        if msg_type == "image":
-            save_line_image(event)
+        if message["type"] != "text":
             continue
 
-        text = event["message"]["text"]
+        text = message["text"]
 
     # ===== 移除 LINE Mention =====
 
