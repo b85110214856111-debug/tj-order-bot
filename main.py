@@ -205,7 +205,7 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
     photo_ws.column_dimensions["A"].width = 15
     photo_ws.column_dimensions["B"].width = 12
     photo_ws.column_dimensions["C"].width = 20
-    photo_ws.column_dimensions["D"].width = 35
+    photo_ws.column_dimensions["D"].width = 55
 
     ws.append([
         "單號",
@@ -340,15 +340,15 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
 
                 excel_img = ExcelImage(img_path)
 
-                excel_img.width = 180
-                excel_img.height = 135
+                excel_img.width = 350
+                excel_img.height = 263
 
                 photo_ws.add_image(
                     excel_img,
                     f"D{row}"
                 )
 
-                photo_ws.row_dimensions[row].height = 110
+                photo_ws.row_dimensions[row].height = 210
 
                 # 不要刪
 
