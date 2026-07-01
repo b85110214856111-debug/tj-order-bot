@@ -41,23 +41,6 @@ cloudinary.config(
     secure=True
 )
 
-import zipfile
-import shutil
-
-def upload_zip_file(zip_path):
-
-    filename = os.path.basename(zip_path)
-
-    result = cloudinary.uploader.upload(
-        zip_path,
-        resource_type="raw",
-        folder="order_exports",
-        public_id=filename.replace(".zip", ""),
-        overwrite=True
-    )
-
-    return result["secure_url"]
-
 import uuid
 
 from io import BytesIO
@@ -118,71 +101,6 @@ creds = Credentials.from_service_account_info(
 
 gc = gspread.authorize(creds)
 
-import requests
-
-def save_line_image(message_id, user_name):
-
-    try:
-
-        headers = {
-            "Authorization": f"Bearer {LINE_TOKEN}"
-        }
-
-        url = (
-            "https://api-data.line.me/v2/bot/message/"
-            f"{message_id}/content"
-        )
-
-        r = requests.get(
-            url,
-            headers=headers,
-            stream=True
-        )
-
-        if r.status_code != 200:
-            return
-
-        filename = (
-            datetime.now().strftime("%Y%m%d_%H%M%S")
-            + ".jpg"
-        )
-
-        tmp = tempfile.NamedTemporaryFile(
-            suffix=".jpg",
-            delete=False
-        )
-
-        for chunk in r.iter_content(1024):
-
-            if chunk:
-
-                tmp.write(chunk)
-
-        tmp.close()
-
-        result = cloudinary.uploader.upload(
-            tmp.name,
-            folder="line_photos",
-            public_id=filename.replace(".jpg", ""),
-            overwrite=True
-        )
-
-        os.remove(tmp.name)
-
-        photo_sheet.append_row([
-            datetime.now().strftime("%m/%d"),
-            datetime.now().strftime("%H:%M:%S"),
-            user_name,
-            filename,
-            result["secure_url"]
-        ])
-
-        print("圖片已儲存")
-
-    except Exception as e:
-
-        print(e)
-
 import time
 
 def init_sheets():
@@ -196,8 +114,7 @@ def init_sheets():
             return (
                 book.sheet1,
                 book.worksheet("Customers"),
-                book.worksheet("Settings"),
-                book.worksheet("Photos")
+                book.worksheet("Settings")
             )
 
         except Exception as e:
@@ -210,7 +127,7 @@ def init_sheets():
             time.sleep(5)
 
     raise Exception("Google Sheet無法連線")
-sheet, customer_sheet, settings_sheet, photo_sheet = init_sheets()
+sheet, customer_sheet, settings_sheet = init_sheets()
 DELIVERY_LIST = ["自取","自送","代送","業務自送","寄大榮","寄黑貓","寄順豐","寄梓華榮"]
 
 
@@ -329,90 +246,7 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
             unit,
             total_qty
         ])
-    # 建立暫存資料夾
-    tmp_dir = tempfile.mkdtemp()
-
-    excel_path = os.path.join(tmp_dir, "Orders.xlsx")
-    wb.save(excel_path)
-
-    photo_dir = os.path.join(tmp_dir, "Photos")
-    os.makedirs(photo_dir, exist_ok=True)
-
-    photo_rows = photo_sheet.get_all_values()
-
-    for r in photo_rows[1:]:
-
-        if len(r) < 5:
-            continue
-
-        photo_date = r[0]
-        filename = r[3]
-        url = r[4]
-
-        # 日期篩選
-        if start_date and end_date:
-
-            try:
-
-                month, day = map(int, photo_date.split("/"))
-                order_num = month * 100 + day
-
-                sm, sd = map(int, start_date.split("/"))
-                em, ed = map(int, end_date.split("/"))
-
-                if order_num < sm * 100 + sd:
-                    continue
-
-                if order_num > em * 100 + ed:
-                    continue
-
-            except:
-                continue
-
-        try:
-
-            img = requests.get(url)
-
-            if img.status_code == 200:
-
-                with open(
-                    os.path.join(photo_dir, filename),
-                    "wb"
-                ) as f:
-
-                    f.write(img.content)
-
-        except:
-            pass
-
-    zip_path = os.path.join(
-        tmp_dir,
-        "Export.zip"
-    )
-
-    with zipfile.ZipFile(
-        zip_path,
-        "w",
-        zipfile.ZIP_DEFLATED
-    ) as z:
-
-        z.write(
-            excel_path,
-            "Orders.xlsx"
-        )
-
-        for f in os.listdir(photo_dir):
-
-            z.write(
-                os.path.join(photo_dir, f),
-                f"Photos/{f}"
-            )
-
-    url = upload_zip_file(zip_path)
-
-    shutil.rmtree(tmp_dir)
-
-    return url
+    return upload_excel_file(wb)
 
 
 
@@ -1827,25 +1661,7 @@ async def callback(request: Request):
         if event["type"] != "message":
             continue
 
-        message = event["message"]
-
-        if message["type"] == "image":
-
-            save_line_image(
-                message["id"],
-                user_name
-            )
-
-            line_bot_api.reply_message(
-                event["replyToken"],
-                TextSendMessage(
-                    text="📷 圖片已儲存"
-                )
-            )
-
-            continue
-
-        text = message["text"]
+        text = event["message"]["text"]
 
     # ===== 移除 LINE Mention =====
 
