@@ -333,18 +333,40 @@ def create_schedule_order(text):
         if not customer_data:
             return "❌ 客戶未設定"
 
+
+        # 商品使用輸入
         product = parts[1] if len(parts) >= 2 else None
 
-        if not product:
-            product = customer_data[1]
 
-        if qty is None:
-            qty_match = re.search(r"(\d+(?:\.\d+)?)", customer_data[2])
-            qty = float(qty_match.group(1))
-            unit = parse_unit(customer_data[2])
+        # 預設值
+        qty = 0
+        unit = ""
+        price = 0
 
-        if price == 0:
-            price = float(customer_data[3])
+
+        # 比對 Customers：同客戶 + 同商品
+        for r in rows[1:]:
+
+            if len(r) < 4:
+                continue
+
+            if r[0] == customer and r[1] == product:
+
+                qty_match = re.search(
+                    r"(\d+(?:\.\d+)?)",
+                    r[2]
+                )
+
+                if qty_match:
+                    qty = float(qty_match.group(1))
+                    unit = parse_unit(r[2])
+
+                try:
+                    price = float(r[3])
+                except:
+                    price = 0
+
+                break
 
 
         weekday_map = {
@@ -356,10 +378,6 @@ def create_schedule_order(text):
             "六":5,
             "日":6
         }    
-
-        # 商品
-        if len(parts) >= 2:
-            product = parts[1]
 
         # 數量
         for p in parts[2:]:
@@ -688,6 +706,8 @@ def create_schedule_order(text):
 
 
     # 找同客戶 + 同商品
+    # 找同客戶 + 同商品
+
     for r in rows[1:]:
 
         if len(r) < 4:
@@ -710,9 +730,6 @@ def create_schedule_order(text):
                 price = 0
 
             break
-
-        qty = float(qty_match.group(1))
-        unit = parse_unit(customer_data[2])
 
     today = datetime.now().date()
 
