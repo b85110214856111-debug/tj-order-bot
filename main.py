@@ -430,8 +430,19 @@ def create_schedule_order(text):
         note = note.replace(customer, "", 1)
         note = note.replace(product, "", 1)
 
-        note = re.sub(r"\d+(?:\.\d+)?[^\s]*", "", note)
-        note = re.sub(r"@\d+(?:\.\d+)?", "", note)
+        note = re.sub(
+            r"@\d+(?:\.\d+)?",
+            "",
+            note
+        )
+
+        note = re.sub(
+            r"\d+(?:\.\d+)?[^\s]*",
+            "",
+            note
+        )
+
+        note = note.replace("@", "")
 
         if delivery:
             note = note.replace(delivery, "")
@@ -461,7 +472,10 @@ def create_schedule_order(text):
                 )
             ]
 
-            next_week_start = today + timedelta(days=7)
+            # 下週一
+            next_week_start = today + timedelta(
+                days=(7 - today.weekday())
+            )
 
             
 
