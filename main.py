@@ -338,13 +338,19 @@ def create_schedule_order(text):
         product = parts[1] if len(parts) >= 2 else None
 
 
-        # 預設值
+        # 先保留輸入值
+        input_qty = qty
+        input_unit = unit
+        input_price = price
+
+
+        # 預設
         qty = 0
         unit = ""
         price = 0
 
 
-        # 比對 Customers：同客戶 + 同商品
+        # 找 Customers 同商品補缺
         for r in rows[1:]:
 
             if len(r) < 4:
@@ -367,6 +373,16 @@ def create_schedule_order(text):
                     price = 0
 
                 break
+
+
+        # 輸入優先覆蓋
+
+        if input_qty:
+            qty = input_qty
+            unit = input_unit
+
+        if input_price:
+            price = input_price
 
 
         weekday_map = {
@@ -687,27 +703,29 @@ def create_schedule_order(text):
             customer_data = r
             break
 
+
     if not customer_data:
         return "❌ 客戶未設定"
 
 
-    # =====================
-    # 商品比對 Customers 基本檔
-    # =====================
-
+    #商品輸入優先
     if not product:
         product = customer_data[1]
 
 
-    # 預設 0
+    # 記住輸入值
+    input_qty = qty
+    input_unit = unit
+    input_price = price
+
+
+    # 預設
     qty = 0
     unit = ""
     price = 0
 
 
-    # 找同客戶 + 同商品
-    # 找同客戶 + 同商品
-
+    # 比對 Customers 同客戶+同商品
     for r in rows[1:]:
 
         if len(r) < 4:
@@ -730,6 +748,42 @@ def create_schedule_order(text):
                 price = 0
 
             break
+
+
+    # 輸入優先覆蓋
+    if input_qty:
+        qty = input_qty
+        unit = input_unit
+
+    if input_price:
+        price = input_price
+
+
+        # 找同客戶 + 同商品
+        # 找同客戶 + 同商品
+
+        for r in rows[1:]:
+
+            if len(r) < 4:
+                continue
+
+            if r[0] == customer and r[1] == product:
+
+                qty_match = re.search(
+                    r"(\d+(?:\.\d+)?)",
+                    r[2]
+                )
+
+                if qty_match:
+                    qty = float(qty_match.group(1))
+                    unit = parse_unit(r[2])
+
+                try:
+                    price = float(r[3])
+                except:
+                    price = 0
+
+                break
 
     today = datetime.now().date()
 
