@@ -34,9 +34,6 @@ import cloudinary
 import cloudinary.uploader
 import tempfile
 
-import zipfile
-import shutil
-
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
     api_key=os.getenv("CLOUDINARY_API_KEY"),
@@ -47,9 +44,6 @@ cloudinary.config(
 import uuid
 
 from io import BytesIO
-from openpyxl.drawing.image import Image as ExcelImage
-from PIL import Image
-import requests
 
 def upload_excel_file(wb):
 
@@ -87,50 +81,6 @@ def upload_excel_file(wb):
 
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
-
-def upload_file(file_path):
-
-    filename = os.path.basename(file_path)
-
-    result = cloudinary.uploader.upload(
-        file_path,
-        resource_type="raw",
-        folder="photo_exports",
-        public_id=filename.replace(".zip", ""),
-        overwrite=True
-    )
-
-    return result["secure_url"]
-
-def save_photo(public_id, user):
-
-    photo_sheet.append_row([
-        datetime.now().strftime("%Y/%m/%d"),
-        datetime.now().strftime("%H:%M:%S"),
-        user,
-        public_id
-    ])
-
-def download_cloudinary_image(public_id):
-
-    url = cloudinary.CloudinaryImage(
-        public_id
-    ).build_url()
-
-    r = requests.get(url)
-
-    if r.status_code != 200:
-        return None
-
-    tmp = tempfile.NamedTemporaryFile(
-        suffix=".jpg",
-        delete=False
-    )
-
-    tmp.write(r.content)
-    tmp.close()
-
-    return tmp.name
 
 import json
 
@@ -178,24 +128,6 @@ def init_sheets():
 
     raise Exception("Google Sheet無法連線")
 sheet, customer_sheet, settings_sheet = init_sheets()
-
-book = gc.open_by_key(SHEET_ID)
-
-try:
-    photo_sheet = book.worksheet("Photos")
-except:
-    photo_sheet = book.add_worksheet(
-        title="Photos",
-        rows=5000,
-        cols=10
-    )
-
-    photo_sheet.append_row([
-        "日期",
-        "時間",
-        "User",
-        "PublicID"
-    ])
 DELIVERY_LIST = ["自取","自送","代送","業務自送","寄大榮","寄黑貓","寄順豐","寄梓華榮"]
 
 
@@ -204,25 +136,9 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
     rows = sheet.get_all_values()
 
     wb = Workbook()
-
-    # 第一個工作表
     ws = wb.active
+
     ws.title = "Orders"
-
-    # 第二個工作表
-    photo_ws = wb.create_sheet("LINE Photos")
-
-    photo_ws.append([
-        "日期",
-        "時間",
-        "傳送者",
-        "照片"
-    ])
-
-    photo_ws.column_dimensions["A"].width = 15
-    photo_ws.column_dimensions["B"].width = 12
-    photo_ws.column_dimensions["C"].width = 20
-    photo_ws.column_dimensions["D"].width = 55
 
     ws.append([
         "單號",
@@ -330,109 +246,10 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
             unit,
             total_qty
         ])
-    # ==========================
-    # 匯出照片
-    # ==========================
-
-    photos = photo_sheet.get_all_values()
-
-    row = 2
-
-    for p in photos[1:]:
-
-        if len(p) < 4:
-            continue
-
-        photo_ws.cell(row=row, column=1).value = p[0]
-        photo_ws.cell(row=row, column=2).value = p[1]
-        photo_ws.cell(row=row, column=3).value = p[2]
-
-        try:
-
-            img_path = download_cloudinary_image(
-                p[3]
-            )
-
-            if img_path:
-
-                excel_img = ExcelImage(img_path)
-
-                excel_img.width = 350
-                excel_img.height = 263
-
-                photo_ws.add_image(
-                    excel_img,
-                    f"D{row}"
-                )
-
-                photo_ws.row_dimensions[row].height = 210
-
-                # 不要刪
-
-        except Exception as e:
-
-            print(e)
-
-        row += 1
-
     return upload_excel_file(wb)
 
 
-def export_photos():
 
-    photos = photo_sheet.get_all_values()
-
-    folder = tempfile.mkdtemp(prefix="photos_")
-
-    for p in photos[1:]:
-
-        if len(p) < 4:
-            continue
-
-        date = p[0]
-        time = p[1]
-        user = p[2]
-        public_id = p[3]
-
-        url = cloudinary.CloudinaryImage(public_id).build_url()
-
-        r = requests.get(url)
-
-        if r.status_code != 200:
-            continue
-
-        filename = f"{date}_{time}_{user}.jpg"
-
-        filename = filename.replace("/", "-").replace(":", "-")
-
-        with open(os.path.join(folder, filename), "wb") as f:
-            f.write(r.content)
-
-    zip_path = os.path.join(
-        tempfile.gettempdir(),
-        "LINE_Photos.zip"
-    )
-
-    with zipfile.ZipFile(
-        zip_path,
-        "w",
-        zipfile.ZIP_DEFLATED
-    ) as z:
-
-        for file in os.listdir(folder):
-
-            z.write(
-                os.path.join(folder, file),
-                arcname=file
-            )
-
-    shutil.rmtree(folder)
-
-    url = upload_file(zip_path)
-
-    os.remove(zip_path)
-
-    return url
 
 def get_user_name(user_id):
 
@@ -1844,57 +1661,6 @@ async def callback(request: Request):
         if event["type"] != "message":
             continue
 
-        user_id = event["source"]["userId"]
-        user_name = get_user_name(user_id)
-
-        # ==========================
-        # 接收圖片
-        # ==========================
-        if event["message"]["type"] == "image":
-
-            message_id = event["message"]["id"]
-
-            content = line_bot_api.get_message_content(
-                message_id
-            )
-
-            with tempfile.NamedTemporaryFile(
-                suffix=".jpg",
-                delete=False
-            ) as tmp:
-
-                for chunk in content.iter_content():
-                    tmp.write(chunk)
-
-                tmp_path = tmp.name
-
-            result = cloudinary.uploader.upload(
-                tmp_path,
-                folder="line_photos"
-            )
-
-            os.remove(tmp_path)
-
-            public_id = result["public_id"]
-
-            save_photo(
-                public_id,
-                user_name
-            )
-
-            line_bot_api.reply_message(
-                event["replyToken"],
-                TextSendMessage(
-                    text="✅ 圖片已自動保存"
-                )
-            )
-
-            continue
-
-        # ==========================
-        # 文字訊息
-        # ==========================
-
         text = event["message"]["text"]
 
     # ===== 移除 LINE Mention =====
@@ -1984,21 +1750,21 @@ async def callback(request: Request):
                     if text:
                         keyword = text
 
-                excel_url = export_orders(
+                url = export_orders(
                     keyword,
                     start_date,
                     end_date
                 )
 
-                photo_url = export_photos(
-                    start_date,
-                    end_date
-                )
-
-                results.append(f"📄 訂單 Excel：\n{excel_url}")
-                results.append(f"📷 照片 ZIP：\n{photo_url}")
-
-                continue              
+                if not url:
+                    results.append(
+                        "❌ 找不到資料"
+                    )
+                
+                else:
+                    results.append(
+                        f"✅ Excel匯出完成\n{url}"
+                    )
 
             elif cmd.startswith("刪單"):
 
