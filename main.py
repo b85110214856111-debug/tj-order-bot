@@ -625,16 +625,18 @@ def create_schedule_order(text):
 
             break
 
-    # 單價
+    # 單價（輸入優先）
 
     for p in parts:
 
-        if p.startswith("@"):
+        m = re.match(
+            r"@(\d+(?:\.\d+)?)",
+            p
+        )
 
-            try:
-                price = float(p[1:])
-            except:
-                pass
+        if m:
+            price = float(m.group(1))
+            break
 
     # 配送
     delivery = ""
