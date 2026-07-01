@@ -624,8 +624,9 @@ def create_schedule_order(text):
         note
     )
 
+    # 移除單價符號
     note = re.sub(
-        r"@\d+(?:\.\d+)?",
+        r"@\d+(?:\.\d+)?|@",
         "",
         note
     )
@@ -633,9 +634,11 @@ def create_schedule_order(text):
     for d in DELIVERY_LIST:
         note = note.replace(d, "")
 
-    note = note.replace(
-        "每週二到貨到月底",
-        ""
+    # 移除排程文字
+    note = re.sub(
+        r"每週[一二三四五六日]+到貨到月底",
+        "",
+        note
     )
 
     note = note.strip()
