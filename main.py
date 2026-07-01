@@ -563,7 +563,10 @@ def create_schedule_order(text):
     parts = order_text.split()
 
     customer = parts[0]
-
+    product = None
+    qty = None
+    unit = None
+    price = 0
 
     delivery = ""
     note = ""
@@ -666,15 +669,22 @@ def create_schedule_order(text):
         return "❌ 客戶未設定"
 
     # 單價預設使用客戶設定
-    price = float(customer_data[3])
+    # 商品：輸入優先，沒有才用客戶設定
+    if not product:
+        product = customer_data[1]
 
-    product = customer_data[1]
+# 數量：輸入優先
+    if qty is None:
+        qty_match = re.search(
+            r"(\d+(?:\.\d+)?)",
+            customer_data[2]
+        )
+        qty = float(qty_match.group(1))
+        unit = parse_unit(customer_data[2])
 
-    qty_match = re.search(r"(\d+(?:\.\d+)?)", customer_data[2])
-    qty = float(qty_match.group(1))
-    unit = parse_unit(customer_data[2])
-
-    price = float(customer_data[3])
+# 單價：輸入優先，沒有才用客戶設定
+    if "price" not in locals() or price == 0:
+        price = float(customer_data[3])
 
     today = datetime.now().date()
 
