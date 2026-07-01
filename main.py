@@ -572,12 +572,20 @@ def create_schedule_order(text):
     note = ""
 
     # 商品
+    product = None
+
     if len(parts) >= 2:
-        product = parts[1]
+
+    # 第二個詞如果是配送，就表示沒輸入商品
+        if parts[1] in DELIVERY_LIST:
+            product = customer_data[1]
+        else:
+            product = parts[1]
+
     else:
         product = customer_data[1]
     # 數量
-    for p in parts[2:]:
+    for p in parts[1:]:
 
         m = re.match(r"(\d+(?:\.\d+)?)(.*)", p)
 
