@@ -955,9 +955,9 @@ def create_schedule_order(text):
 
 
     # 預設
-    qty = None
+    qty = 0
     unit = None
-    price = None
+    price = 0
 
 
     # 比對 Customers 同客戶+同商品
@@ -994,7 +994,7 @@ def create_schedule_order(text):
     if input_unit:
         unit = input_unit
 
-    if input_price and input_price > 0:
+    if input_price is not None and input_price > 0:
         price = input_price
 
     today = datetime.now().date()
