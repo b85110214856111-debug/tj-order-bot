@@ -352,45 +352,6 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
     wb.save(excel_buffer)
     excel_buffer.seek(0)
 
-
-
-    photos = photo_sheet.get_all_values()
-
-    index = 1
-
-    for p in photos[1:]:
-
-        if start_date and end_date:
-
-            sm, sd = map(int, start_date.split("/"))
-            em, ed = map(int, end_date.split("/"))
-
-            pm, pd = map(int, p[0].split("/"))
-
-            s = sm * 100 + sd
-            e = em * 100 + ed
-            d = pm * 100 + pd
-
-            if d < s or d > e:
-                continue
-
-        filename = (
-            f"{p[0].replace('/','-')}_"
-            f"{p[2]}_"
-            f"{index:03d}.jpg"
-        )
-
-        download_file(
-            p[4],
-            os.path.join(
-                photo_folder,
-                filename
-            )
-        )
-    
-
-        index += 1
-
     zip_buffer = BytesIO()
 
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as z:
