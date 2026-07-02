@@ -2112,10 +2112,3 @@ async def callback(request: Request):
 @app.get("/")
 def home():
     return {"status":"running"}
-
-@app.get("/health")
-def health():
-    return {
-        "status": "ok",
-        "service": "TJ Order Bot"
-    }
