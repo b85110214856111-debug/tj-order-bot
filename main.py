@@ -2,6 +2,7 @@
 # LINE + FastAPI + Google Sheets 訂單系統（商用整合版）
 import os
 import re
+import requests
 from datetime import datetime
 from tracemalloc import start
 from fastapi import FastAPI, Request
@@ -41,9 +42,87 @@ cloudinary.config(
     secure=True
 )
 
+import zipfile
+
+def download_file(url, path):
+
+    r = requests.get(url)
+
+    if r.status_code == 200:
+
+        with open(path, "wb") as f:
+
+            f.write(r.content)
+
 import uuid
 
 from io import BytesIO
+
+def download_line_image(message_id):
+
+    headers = {
+        "Authorization": f"Bearer {LINE_TOKEN}"
+    }
+
+    url = f"https://api-data.line.me/v2/bot/message/{message_id}/content"
+
+    r = requests.get(url, headers=headers)
+
+    if r.status_code != 200:
+        return None
+
+    return r.content
+
+def upload_photo(image_bytes, filename):
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".jpg",
+        delete=False
+    ) as tmp:
+
+        tmp.write(image_bytes)
+
+        tmp_path = tmp.name
+
+    try:
+
+        result = cloudinary.uploader.upload(
+            tmp_path,
+            folder="order_photos",
+            public_id=filename,
+            overwrite=True
+        )
+
+        return result["secure_url"]
+
+    finally:
+
+        os.remove(tmp_path)
+
+def save_photo(user_name, message_id):
+
+    image = download_line_image(message_id)
+
+    if image is None:
+        return
+
+    filename = datetime.now().strftime(
+        "IMG_%Y%m%d_%H%M%S"
+    )
+
+    url = upload_photo(
+        image,
+        filename
+    )
+
+    photo_sheet.append_row([
+        datetime.now().strftime("%m/%d"),
+        datetime.now().strftime("%H:%M:%S"),
+        user_name,
+        message_id,
+        url,
+        filename + ".jpg"
+    ])
 
 def upload_excel_file(wb):
 
@@ -82,6 +161,18 @@ def upload_excel_file(wb):
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
 
+def upload_zip(path):
+
+    result = cloudinary.uploader.upload(
+        path,
+        resource_type="raw",
+        folder="exports",
+        public_id=os.path.basename(path).replace(".zip",""),
+        overwrite=True
+    )
+
+    return result["secure_url"]
+
 import json
 
 google_credentials = os.getenv("GOOGLE_CREDENTIALS")
@@ -114,7 +205,8 @@ def init_sheets():
             return (
                 book.sheet1,
                 book.worksheet("Customers"),
-                book.worksheet("Settings")
+                book.worksheet("Settings"),
+                book.worksheet("Photos")
             )
 
         except Exception as e:
@@ -127,7 +219,7 @@ def init_sheets():
             time.sleep(5)
 
     raise Exception("Google Sheet無法連線")
-sheet, customer_sheet, settings_sheet = init_sheets()
+sheet, customer_sheet, settings_sheet, photo_sheet = init_sheets()
 DELIVERY_LIST = ["自取","自送","代送","業務自送","寄大榮","寄黑貓","寄順豐","寄梓華榮"]
 
 
@@ -246,7 +338,86 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
             unit,
             total_qty
         ])
-    return upload_excel_file(wb)
+    excel_path = "Orders.xlsx"
+
+    wb.save(excel_path)
+
+    photo_folder = "Photos"
+
+    os.makedirs(
+        photo_folder,
+        exist_ok=True
+    )
+
+    import shutil
+
+    if os.path.exists(photo_folder):
+        shutil.rmtree(photo_folder)
+
+    os.makedirs(photo_folder)
+
+    photos = photo_sheet.get_all_values()
+
+    index = 1
+
+    for p in photos[1:]:
+
+        if start_date and end_date:
+
+            sm, sd = map(int, start_date.split("/"))
+            em, ed = map(int, end_date.split("/"))
+
+            pm, pd = map(int, p[0].split("/"))
+
+            s = sm * 100 + sd
+            e = em * 100 + ed
+            d = pm * 100 + pd
+
+            if d < s or d > e:
+                continue
+
+        filename = (
+            f"{p[0].replace('/','-')}_"
+            f"{p[2]}_"
+            f"{index:03d}.jpg"
+        )
+
+        download_file(
+            p[4],
+            os.path.join(
+                photo_folder,
+                filename
+            )
+        )
+    
+
+        index += 1
+
+    zip_name = (
+        f"Export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+    )
+
+    with zipfile.ZipFile(
+        zip_name,
+        "w",
+        zipfile.ZIP_DEFLATED
+    ) as z:
+
+        z.write(
+            excel_path,
+            "Orders.xlsx"
+        )
+
+        for f in os.listdir(photo_folder):
+
+            z.write(
+                os.path.join(photo_folder, f),
+                os.path.join("Photos", f)
+            )
+
+    url = upload_zip(zip_name)
+
+    return url
 
 
 
@@ -1661,9 +1832,32 @@ async def callback(request: Request):
         if event["type"] != "message":
             continue
 
-        text = event["message"]["text"]
+        msg_type = event["message"]["type"]
 
-    # ===== 移除 LINE Mention =====
+        user_id = event["source"]["userId"]
+        user_name = get_user_name(user_id)
+
+        # ===== 收到照片 =====
+        if msg_type == "image":
+
+            message_id = event["message"]["id"]
+
+            save_photo(
+                user_name,
+                message_id
+            )
+
+            line_bot_api.reply_message(
+                event["replyToken"],
+                TextSendMessage(text="📷 照片已儲存")
+            )
+
+            continue
+
+        # ===== 以下才處理文字 =====
+        text = event["message"]["text"]
+        
+        # ===== 移除 LINE Mention =====
 
         mentionees = []
 
