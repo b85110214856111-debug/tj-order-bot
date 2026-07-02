@@ -4,7 +4,6 @@ import os
 import re
 import requests
 from datetime import datetime
-from tracemalloc import start
 from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse
 from dotenv import load_dotenv
