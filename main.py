@@ -171,7 +171,7 @@ def upload_zip(zip_bytes):
         resource_type="raw",
         folder="exports",
         public_id=filename.replace(".zip", ""),
-        overwrite=True
+        overwrite=True,
         format="zip"
     )
 
