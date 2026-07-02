@@ -700,15 +700,12 @@ def create_schedule_order(text):
 
             days_to_next_monday = 7 - today.weekday()
 
-            second_week_start = (
-                today
-                + timedelta(days=days_to_next_monday + 7)
+            second_week_start = today + timedelta(
+                days=days_to_next_monday + 7
             )
 
-            current = second_week_start
-
-            target_year = start.year
-            target_month = start.month
+            target_year = second_week_start.year
+            target_month = second_week_start.month
 
             last_day = calendar.monthrange(
                 target_year,
@@ -721,7 +718,7 @@ def create_schedule_order(text):
                 last_day
             ).date()
 
-            current = start
+            current = second_week_start
 
             while current <= end_date:
 
@@ -729,13 +726,10 @@ def create_schedule_order(text):
 
                     date_str = f"{current.month}/{current.day}"
 
-                    if date_str in added_dates:
-                        current += timedelta(days=1)
-                        continue
+                    if date_str not in added_dates:
 
-                    added_dates.add(date_str)
-
-                    target_dates.append(date_str)
+                        added_dates.add(date_str)
+                        target_dates.append(date_str)
 
                 current += timedelta(days=1)
 
