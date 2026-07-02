@@ -2109,6 +2109,9 @@ async def callback(request: Request):
     return PlainTextResponse("OK")
 
 
-@app.get("/")
+from fastapi import Response
+
+@app.api_route("/", methods=["GET", "HEAD"])
 def home():
-    return {"status":"running"}
+    if Response:
+        return {"status": "running"}
