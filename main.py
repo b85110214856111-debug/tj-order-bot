@@ -946,8 +946,7 @@ def create_schedule_order(text):
 
 
     #商品輸入優先
-    if not product:
-        product = customer_data[1]
+    
 
 
     input_qty = qty
@@ -987,7 +986,6 @@ def create_schedule_order(text):
 
 
     # 輸入優先覆蓋
-    # 輸入優先覆蓋
     # 輸入有值才覆蓋，沒有就用基本檔
 
     if input_qty is not None:
@@ -1014,24 +1012,66 @@ def create_schedule_order(text):
 
     orders = []
 
-    current = today
+# 沒輸入商品 -> 建立客戶所有預設商品
+    if not product:
 
-    while current <= end_date:
+        customer_rows = [
+            r for r in rows[1:]
+            if r[0] == customer
+        ]
 
-        if current.weekday() in target_days:
+        current = today
 
-            orders.append({
-                "date": f"{current.month}/{current.day}",
-                "customer": customer,
-                "product": product,
-                "qty": qty,
-                "unit": unit,
-                "price": price,
-                "delivery": delivery,
-                "note": note if note else "固定排程"
-            })
+        while current <= end_date:
 
-        current += timedelta(days=1)
+            if current.weekday() in target_days:
+
+                for r in customer_rows:
+
+                    qty_match = re.search(r"(\d+(?:\.\d+)?)", r[2])
+
+                    default_qty = float(qty_match.group(1)) if qty_match else 0
+                    default_unit = parse_unit(r[2])
+
+                    try:
+                        default_price = float(r[3])
+                    except:
+                        default_price = 0
+
+                    orders.append({
+                        "date": f"{current.month}/{current.day}",
+                        "customer": customer,
+                        "product": r[1],
+                        "qty": default_qty,
+                        "unit": default_unit,
+                        "price": default_price,
+                        "delivery": delivery,
+                        "note": note if note else "固定排程"
+                    })
+
+            current += timedelta(days=1)
+
+    # 有輸入商品
+    else:
+
+        current = today
+
+        while current <= end_date:
+
+            if current.weekday() in target_days:
+
+                orders.append({
+                    "date": f"{current.month}/{current.day}",
+                    "customer": customer,
+                    "product": product,
+                    "qty": qty,
+                    "unit": unit,
+                    "price": price,
+                    "delivery": delivery,
+                    "note": note if note else "固定排程"
+                })
+
+            current += timedelta(days=1)
 
     if not orders:
         return "❌ 沒有符合日期"
