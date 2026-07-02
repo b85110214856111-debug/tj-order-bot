@@ -699,7 +699,14 @@ def create_schedule_order(text):
                 for x in m.group(1)
             ]
 
-            start = today + timedelta(days=14)
+            days_to_next_monday = 7 - today.weekday()
+
+            second_week_start = (
+                today
+                + timedelta(days=days_to_next_monday + 7)
+            )
+
+            current = second_week_start
 
             target_year = start.year
             target_month = start.month
