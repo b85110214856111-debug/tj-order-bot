@@ -490,6 +490,7 @@ import calendar
 def create_schedule_order(text):
     added_dates = set()
     orders = []
+    target_dates = []
 
     lines = [
         x.strip()
@@ -514,19 +515,18 @@ def create_schedule_order(text):
 
         rows = customer_sheet.get_all_values()
 
-        customer_data = None
+        customer_rows = []
 
         for r in rows[1:]:
             if r[0] == customer:
-                customer_data = r
-                break
+                customer_rows.append(r)
 
-        if not customer_data:
+        if not customer_rows:
             return "❌ 客戶未設定"
 
 
-        # 商品使用輸入
-        product = parts[1] if len(parts) >= 2 else None
+        # 使用者有輸入商品
+        product = parts[1] if len(parts) >= 2 else ""
 
 
         # 先保留輸入值
@@ -683,16 +683,7 @@ def create_schedule_order(text):
 
                     added_dates.add(date_str)
 
-                    orders.append({
-                        "date": date_str,
-                        "customer": customer,
-                        "product": product,
-                        "qty": qty,
-                        "unit": unit,
-                        "price": price,
-                        "delivery": "",
-                        "note": "特殊排程"
-                    })
+                    target_dates.append(date_str)
 
         # 之後每週二三四五到月底
 
@@ -738,10 +729,36 @@ def create_schedule_order(text):
 
                     added_dates.add(date_str)
 
+                    target_dates.append(date_str)
+
+                current += timedelta(days=1)
+
+        if not product:
+
+            customer_rows = [
+                r for r in rows[1:]
+                if r[0] == customer
+            ]
+
+            for r in customer_rows:
+
+                qty_match = re.search(r"(\d+(?:\.\d+)?)", r[2])
+
+                qty = float(qty_match.group(1)) if qty_match else 0
+
+                unit = parse_unit(r[2])
+
+                try:
+                    price = float(r[3])
+                except:
+                    price = 0
+
+                for date_str in target_dates:
+
                     orders.append({
                         "date": date_str,
                         "customer": customer,
-                        "product": product,
+                        "product": r[1],
                         "qty": qty,
                         "unit": unit,
                         "price": price,
@@ -749,7 +766,20 @@ def create_schedule_order(text):
                         "note": note if note else "固定排程"
                     })
 
-                current += timedelta(days=1)
+        else:
+
+            for date_str in target_dates:
+
+                orders.append({
+                    "date": date_str,
+                    "customer": customer,
+                    "product": product,
+                    "qty": qty,
+                    "unit": unit,
+                    "price": price,
+                    "delivery": delivery,
+                    "note": note if note else "固定排程"
+                })
 
         if not orders:
             return "❌ 沒有符合日期"
