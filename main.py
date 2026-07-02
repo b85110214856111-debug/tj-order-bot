@@ -18,7 +18,6 @@ print(os.getenv("GOOGLE_DRIVE_FOLDER_ID"))
 app = FastAPI()
 BASE_URL = os.getenv(
     "BASE_URL",
-    "http://127.0.0.1:8000"
 )
 LINE_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
 SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
