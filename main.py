@@ -226,6 +226,12 @@ def init_sheets():
 sheet, customer_sheet, settings_sheet, photo_sheet = init_sheets()
 DELIVERY_LIST = ["自取","自送","代送","業務自送","寄大榮","寄黑貓","寄順豐","寄梓華榮"]
 
+def download_file_bytes(url):
+    r = requests.get(url, timeout=30)
+    if r.status_code == 200:
+        return r.content
+    return None
+
 
 def export_orders(keyword="全部", start_date=None, end_date=None):
 
@@ -346,19 +352,7 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
     wb.save(excel_buffer)
     excel_buffer.seek(0)
 
-    photo_folder = "Photos"
 
-    os.makedirs(
-        photo_folder,
-        exist_ok=True
-    )
-
-    import shutil
-
-    if os.path.exists(photo_folder):
-        shutil.rmtree(photo_folder)
-
-    os.makedirs(photo_folder)
 
     photos = photo_sheet.get_all_values()
 
@@ -399,11 +393,7 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
 
     zip_buffer = BytesIO()
 
-    with zipfile.ZipFile(
-        zip_buffer,
-        "w",
-        zipfile.ZIP_DEFLATED
-    ) as z:
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as z:
 
         # Excel
         z.writestr(
@@ -411,15 +401,39 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
             excel_buffer.getvalue()
         )
 
-        # Photos
-        for filename in os.listdir(photo_folder):
-            file_path = os.path.join(photo_folder, filename)
+        # Photos（🔥直接串流，不落地）
+        photos = photo_sheet.get_all_values()
 
-            with open(file_path, "rb") as f:
-                z.writestr(
-                    os.path.join("Photos", filename),
-                    f.read()
-                )
+        index = 1
+
+        for p in photos[1:]:
+
+            if start_date and end_date:
+                sm, sd = map(int, start_date.split("/"))
+                em, ed = map(int, end_date.split("/"))
+                pm, pd = map(int, p[0].split("/"))
+
+                s = sm * 100 + sd
+                e = em * 100 + ed
+                d = pm * 100 + pd
+
+                if d < s or d > e:
+                    continue
+
+            img_bytes = download_file_bytes(p[4])
+            if not img_bytes:
+                continue
+
+            filename = (
+                f"{p[0].replace('/','-')}_"
+                f"{p[2]}_"
+                f"{index:03d}.jpg"
+            )
+
+            z.writestr(f"Photos/{filename}", img_bytes)
+
+            index += 1
+
 
     zip_buffer.seek(0)
 
