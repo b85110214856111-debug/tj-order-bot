@@ -172,6 +172,7 @@ def upload_zip(zip_bytes):
         folder="exports",
         public_id=filename.replace(".zip", ""),
         overwrite=True
+        format="zip"
     )
 
     return result["secure_url"]
