@@ -160,13 +160,17 @@ def upload_excel_file(wb):
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
 
-def upload_zip(path):
+def upload_zip(zip_bytes):
+
+    filename = (
+        f"Export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+    )
 
     result = cloudinary.uploader.upload(
-        path,
+        zip_bytes,
         resource_type="raw",
         folder="exports",
-        public_id=os.path.basename(path).replace(".zip",""),
+        public_id=filename.replace(".zip", ""),
         overwrite=True
     )
 
@@ -337,9 +341,9 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
             unit,
             total_qty
         ])
-    excel_path = "Orders.xlsx"
-
-    wb.save(excel_path)
+    excel_buffer = BytesIO()
+    wb.save(excel_buffer)
+    excel_buffer.seek(0)
 
     photo_folder = "Photos"
 
@@ -392,31 +396,36 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
 
         index += 1
 
-    zip_name = (
-        f"Export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
-    )
+    zip_buffer = BytesIO()
 
     with zipfile.ZipFile(
-        zip_name,
+        zip_buffer,
         "w",
         zipfile.ZIP_DEFLATED
     ) as z:
 
-        z.write(
-            excel_path,
-            "Orders.xlsx"
+        # Excel
+        z.writestr(
+            "Orders.xlsx",
+            excel_buffer.getvalue()
         )
 
-        for f in os.listdir(photo_folder):
+        # Photos
+        for filename in os.listdir(photo_folder):
+            file_path = os.path.join(photo_folder, filename)
 
-            z.write(
-                os.path.join(photo_folder, f),
-                os.path.join("Photos", f)
-            )
+            with open(file_path, "rb") as f:
+                z.writestr(
+                    os.path.join("Photos", filename),
+                    f.read()
+                )
 
-    url = upload_zip(zip_name)
+    zip_buffer.seek(0)
+
+    url = upload_zip(zip_buffer.getvalue())
 
     return url
+
 
 
 
