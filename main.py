@@ -1130,7 +1130,11 @@ def edit_order(text):
 
         head = lines[0].split()
 
-        if len(head) < 3:
+        # 去掉 "改單"
+        if head[0] == "改單":
+            head = head[1:]
+
+        if len(head) < 2:
             return "❌ 格式錯誤（日期/客戶）"
 
         date = head[0]
