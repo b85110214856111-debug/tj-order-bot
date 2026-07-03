@@ -2,6 +2,7 @@
 # LINE + FastAPI + Google Sheets 訂單系統（商用整合版）
 import os
 import re
+import token
 import requests
 from datetime import datetime, timezone, timedelta
 from fastapi import FastAPI, Request
@@ -1153,6 +1154,12 @@ def edit_order(text):
 
                 token = remain[i]
 
+                # ===== 改日期 =====
+                if token.startswith("!"):
+                    updates["日期"] = token[1:]
+                    i += 1
+                    continue
+
                 # ===== 改商品 =====
                 if token.startswith("*"):
                     updates["商品"] = token[1:]
@@ -1228,6 +1235,8 @@ def edit_order(text):
                 if "備註" in updates:
                     sheet.update_cell(row_no, 10, updates["備註"])
 
+                if "日期" in updates:
+                    sheet.update_cell(row_no, 3, updates["日期"])
                 updated_total += 1
 
     if updated_total == 0:
