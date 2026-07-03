@@ -1095,186 +1095,330 @@ UNIT_WHITELIST = [
     "K","k"
 ]
 
-def parse_edit_fields_v3(text):
-    fields = {}
-
-    # 商品改名
-    m = re.search(r"\*(\S+)", text)
-    if m:
-        fields["product"] = m.group(1)
-
-    # 單價
-    m = re.search(r"單價\s*@(\d+(?:\.\d+)?)", text)
-    if m:
-        fields["price"] = m.group(1)
-
-    # 數量
-    m = re.search(r"數量\s*(\d+(?:\.\d+)?)(\S*)", text)
-    if m:
-        fields["qty"] = m.group(1)
-        if m.group(2):
-            fields["unit"] = m.group(2)
-
-    # 備註
-    m = re.search(r"備註\s*(.+?)(?=\s+\S+?:|$)", text)
-    if m:
-        fields["note"] = m.group(1).strip()
-
-    # 配送
-    m = re.search(r"配送(?:方式)?\s*(\S+)", text)
-    if m:
-        fields["delivery"] = m.group(1)
-
-    return fields
-
 def edit_order(text):
 
     rows = sheet.get_all_values()
 
-    text = text.replace("\n", " ").strip()
+    text = text.rstrip()
 
-    m = re.match(
-        r"改單\s+(.+?)\s+(日期|商品|數量|單價|配送|備註)\s+(.+)$",
-        text
-    )
+    # =========================
+    # 多行模式
+    # =========================
 
-    if not m:
-        return "❌ 格式錯誤"
+    if "\n" in text:
 
-    target_text = m.group(1).strip()
-    fields = parse_edit_fields_v3(text)
+        lines = [
+            x.strip()
+            for x in text.splitlines()
+            if x.strip()
+        ]
 
-    dates = re.findall(
-        r"\d{1,2}/\d{1,2}",
-        target_text
-    )
+        head = lines[0].split()
 
-    order_ids = re.findall(
-        r"\d{9,}",
-        target_text
-    )
+        if len(head) < 3:
+            return "❌ 格式錯誤"
 
-    customer = ""
-    product = ""
+        date = head[1]
+        customer = head[2]
 
-    tokens = target_text.split()
+        updated = 0
 
-    normal = []
+        FIELD_KEYS = [
+            "單價",
+            "數量",
+            "配送",
+            "備註"
+        ]
 
-    for t in tokens:
+        for line in lines[1:]:
 
-        if re.match(r"\d{1,2}/\d{1,2}", t):
-            continue
+            parts = line.split()
 
-        if re.match(r"\d{9,}", t):
-            continue
+            if not parts:
+                continue
 
-        normal.append(t)
+            old_product = parts[0]
 
-    if len(normal) >= 1:
-        customer = normal[0]
+            updates = {}
 
-    if len(normal) >= 2:
-        product = normal[1]
+            i = 1
 
-    qty = None
-    unit = ""
-    note = ""
+            while i < len(parts):
 
-    if field == "數量":
+                token = parts[i]
 
-        qty_match = re.match(
-            r"(\d+(?:\.\d+)?)(.*)",
-            value
-        )
+                # 新商品
+                if token.startswith("*"):
 
-        if not qty_match:
-            return "❌ 數量格式錯誤"
+                    updates["商品"] = token[1:]
+                    i += 1
+                    continue
 
-        qty = qty_match.group(1)
+                # 單價
+                if token == "單價":
 
-        remain = qty_match.group(2).strip()
+                    if i + 1 < len(parts):
 
-        if remain:
+                        updates["單價"] = parts[i + 1]
 
-            for u in sorted(
-                UNIT_WHITELIST,
-                key=len,
-                reverse=True
-            ):
+                    i += 2
+                    continue
 
-                if remain.startswith(u):
+                # 數量
+                if token == "數量":
 
-                    unit = u
-                    note = remain[len(u):].strip()
+                    if i + 1 < len(parts):
+
+                        qty_text = parts[i + 1]
+
+                        m = re.match(
+                            r"(\d+(?:\.\d+)?)(.*)",
+                            qty_text
+                        )
+
+                        if m:
+
+                            updates["數量"] = m.group(1)
+                            updates["單位"] = parse_unit(qty_text)
+
+                    i += 2
+                    continue
+
+                # 配送
+                if token == "配送":
+
+                    if i + 1 < len(parts):
+
+                        updates["配送"] = parts[i + 1]
+
+                    i += 2
+                    continue
+
+                # 備註
+                if token == "備註":
+
+                    updates["備註"] = " ".join(parts[i + 1:])
 
                     break
 
-            if not unit:
+                i += 1
+                if not updates:
+                    continue
 
-                note = remain
+            for row_no, r in enumerate(rows[1:], start=2):
+
+                status = r[11] if len(r) > 11 else ""
+
+                if status == "已刪除":
+                    continue
+
+                if r[2] != date:
+                    continue
+
+                if r[3] != customer:
+                    continue
+
+                if r[4] != old_product:
+                    continue
+
+                if "商品" in updates:
+                    sheet.update_cell(
+                        row_no,
+                        5,
+                        updates["商品"]
+                    )
+
+                if "數量" in updates:
+                    sheet.update_cell(
+                        row_no,
+                        6,
+                        updates["數量"]
+                    )
+
+                if "單位" in updates:
+                    sheet.update_cell(
+                        row_no,
+                        7,
+                        updates["單位"]
+                    )
+
+                if "單價" in updates:
+                    sheet.update_cell(
+                        row_no,
+                        8,
+                        updates["單價"]
+                    )
+
+                if "配送" in updates:
+                    sheet.update_cell(
+                        row_no,
+                        9,
+                        updates["配送"]
+                    )
+
+                if "備註" in updates:
+                    sheet.update_cell(
+                        row_no,
+                        10,
+                        updates["備註"]
+                    )
+
+                updated += 1
+
+        if updated == 0:
+            return "❌ 找不到符合訂單"
+
+        return f"✅ 已修改 {updated} 筆"
+
+    # =========================
+    # 單行模式
+    # =========================
+
+    text = text.replace("\n", " ").strip()
+
+    parts = text.split()
+
+    if len(parts) < 4:
+        return "❌ 格式錯誤"
+
+    date = parts[1]
+    customer = parts[2]
+    old_product = parts[3]
+
+    remain = parts[4:]
+
+    updates = {}
+
+    i = 0
+    while i < len(remain):
+
+        token = remain[i]
+
+        # 新商品
+        if token.startswith("*"):
+
+            updates["商品"] = token[1:]
+
+            i += 1
+            continue
+
+        # 單價
+        if token == "單價":
+
+            if i + 1 < len(remain):
+
+                updates["單價"] = remain[i + 1]
+
+            i += 2
+            continue
+
+        # 數量
+        if token == "數量":
+
+            if i + 1 < len(remain):
+
+                qty_text = remain[i + 1]
+
+                m = re.match(
+                    r"(\d+(?:\.\d+)?)(.*)",
+                    qty_text
+                )
+
+                if m:
+
+                    updates["數量"] = m.group(1)
+                    updates["單位"] = parse_unit(qty_text)
+
+            i += 2
+            continue
+
+        # 配送
+        if token == "配送":
+
+            if i + 1 < len(remain):
+
+                updates["配送"] = remain[i + 1]
+
+            i += 2
+            continue
+
+        # 備註
+        if token == "備註":
+
+            updates["備註"] = " ".join(remain[i + 1:])
+
+            break
+
+        i += 1
+
+    if not updates:
+        return "❌ 沒有修改內容"
 
     updated = 0
 
-    for i, r in enumerate(
-        rows[1:],
-        start=2
-    ):
+    for row_no, r in enumerate(rows[1:], start=2):
 
         status = r[11] if len(r) > 11 else ""
 
         if status == "已刪除":
             continue
 
-        match = False
-
-        # 單號模式
-        if order_ids:
-
-            if r[0] in order_ids:
-                match = True
-
-        # 日期模式
-        elif dates:
-
-            if r[2] not in dates:
-                continue
-
-            if customer and r[3] != customer:
-                continue
-
-            if product and r[4] != product:
-                continue
-
-            match = True
-
-        if not match:
+        if r[2] != date:
             continue
 
-        if "product" in fields:
-            sheet.update_cell(i, 5, fields["product"])
+        if r[3] != customer:
+            continue
 
-        if "price" in fields:
-            sheet.update_cell(i, 8, fields["price"])
+        if r[4] != old_product:
+            continue
+        if "商品" in updates:
+            sheet.update_cell(
+                row_no,
+                5,
+                updates["商品"]
+            )
 
-        if "qty" in fields:
-            sheet.update_cell(i, 6, fields["qty"])
+        if "數量" in updates:
+            sheet.update_cell(
+                row_no,
+                6,
+                updates["數量"]
+            )
 
-        if "unit" in fields:
-            sheet.update_cell(i, 7, fields["unit"])
+        if "單位" in updates:
+            sheet.update_cell(
+                row_no,
+                7,
+                updates["單位"]
+            )
 
-        if "note" in fields:
-            sheet.update_cell(i, 10, fields["note"])
+        if "單價" in updates:
+            sheet.update_cell(
+                row_no,
+                8,
+                updates["單價"]
+            )
 
-        if "delivery" in fields:
-            sheet.update_cell(i, 9, fields["delivery"])
+        if "配送" in updates:
+            sheet.update_cell(
+                row_no,
+                9,
+                updates["配送"]
+            )
+
+        if "備註" in updates:
+            sheet.update_cell(
+                row_no,
+                10,
+                updates["備註"]
+            )
 
         updated += 1
 
     if updated == 0:
         return "❌ 找不到符合訂單"
 
-    return f"✅ 已改 {updated} 筆"
+    return f"✅ 已修改 {updated} 筆"
 
 def parse_unit(text):
 
