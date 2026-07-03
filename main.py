@@ -1098,12 +1098,7 @@ UNIT_WHITELIST = [
 def edit_order(text):
 
     rows = sheet.get_all_values()
-
     text = text.strip()
-
-    # =========================
-    # 分區塊：每個客人一段（用空行分）
-    # =========================
 
     blocks = [
         b.strip()
@@ -1124,13 +1119,9 @@ def edit_order(text):
         if len(lines) < 2:
             continue
 
-        # =========================
-        # 第一行：日期 + 客戶
-        # =========================
-
+        # ========= 第一行：日期 + 客戶 =========
         head = lines[0].split()
 
-        # 去掉 "改單"
         if head[0] == "改單":
             head = head[1:]
 
@@ -1140,14 +1131,10 @@ def edit_order(text):
         date = head[0]
         customer = head[1]
 
-        # =========================
-        # 逐行商品
-        # =========================
-
+        # ========= 每一行商品 =========
         for line in lines[1:]:
 
             parts = line.split()
-
             if not parts:
                 continue
 
@@ -1157,12 +1144,11 @@ def edit_order(text):
             updates = {}
 
             i = 0
-
             while i < len(remain):
 
                 token = remain[i]
 
-                # ===== 新商品 =====
+                # ===== 改商品 =====
                 if token.startswith("*"):
                     updates["商品"] = token[1:]
                     i += 1
@@ -1200,18 +1186,10 @@ def edit_order(text):
 
                 i += 1
 
-            # =========================
-            # 寫入 Google Sheet
-            # =========================
-
+            # ========= 套用到 sheet =========
             for row_no, r in enumerate(rows[1:], start=2):
 
                 if len(r) < 5:
-                    continue
-
-                status = r[11] if len(r) > 11 else ""
-
-                if status == "已刪除":
                     continue
 
                 if r[2] != date:
@@ -1221,6 +1199,10 @@ def edit_order(text):
                     continue
 
                 if r[4] != old_product:
+                    continue
+
+                status = r[11] if len(r) > 11 else ""
+                if status == "已刪除":
                     continue
 
                 if "商品" in updates:
