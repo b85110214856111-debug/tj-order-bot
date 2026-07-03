@@ -1095,6 +1095,38 @@ UNIT_WHITELIST = [
     "K","k"
 ]
 
+def parse_edit_fields_v3(text):
+    fields = {}
+
+    # 商品改名
+    m = re.search(r"\*(\S+)", text)
+    if m:
+        fields["product"] = m.group(1)
+
+    # 單價
+    m = re.search(r"單價\s*@(\d+(?:\.\d+)?)", text)
+    if m:
+        fields["price"] = m.group(1)
+
+    # 數量
+    m = re.search(r"數量\s*(\d+(?:\.\d+)?)(\S*)", text)
+    if m:
+        fields["qty"] = m.group(1)
+        if m.group(2):
+            fields["unit"] = m.group(2)
+
+    # 備註
+    m = re.search(r"備註\s*(.+?)(?=\s+\S+?:|$)", text)
+    if m:
+        fields["note"] = m.group(1).strip()
+
+    # 配送
+    m = re.search(r"配送(?:方式)?\s*(\S+)", text)
+    if m:
+        fields["delivery"] = m.group(1)
+
+    return fields
+
 def edit_order(text):
 
     rows = sheet.get_all_values()
@@ -1110,8 +1142,7 @@ def edit_order(text):
         return "❌ 格式錯誤"
 
     target_text = m.group(1).strip()
-    field = m.group(2).strip()
-    value = m.group(3).strip()
+    fields = parse_edit_fields_v3(text)
 
     dates = re.findall(
         r"\d{1,2}/\d{1,2}",
@@ -1185,15 +1216,6 @@ def edit_order(text):
 
     updated = 0
 
-    col_map = {
-        "日期":3,
-        "商品":5,
-        "數量":6,
-        "單價":8,
-        "配送":9,
-        "備註":10
-    }
-
     for i, r in enumerate(
         rows[1:],
         start=2
@@ -1229,37 +1251,23 @@ def edit_order(text):
         if not match:
             continue
 
-        if field == "數量":
+        if "product" in fields:
+            sheet.update_cell(i, 5, fields["product"])
 
-            sheet.update_cell(
-                i,
-                6,
-                qty
-            )
+        if "price" in fields:
+            sheet.update_cell(i, 8, fields["price"])
 
-            if unit:
+        if "qty" in fields:
+            sheet.update_cell(i, 6, fields["qty"])
 
-                sheet.update_cell(
-                    i,
-                    7,
-                    unit
-                )
+        if "unit" in fields:
+            sheet.update_cell(i, 7, fields["unit"])
 
-            if note:
+        if "note" in fields:
+            sheet.update_cell(i, 10, fields["note"])
 
-                sheet.update_cell(
-                    i,
-                    10,
-                    note
-                )
-
-        else:
-
-            sheet.update_cell(
-                i,
-                col_map[field],
-                value
-            )
+        if "delivery" in fields:
+            sheet.update_cell(i, 9, fields["delivery"])
 
         updated += 1
 
