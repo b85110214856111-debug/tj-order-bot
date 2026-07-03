@@ -1133,8 +1133,8 @@ def edit_order(text):
         if len(head) < 3:
             return "❌ 格式錯誤（日期/客戶）"
 
-        date = head[1]
-        customer = head[2]
+        date = head[0]
+        customer = head[1]
 
         # =========================
         # 逐行商品
