@@ -1087,11 +1087,12 @@ def create_schedule_order(text):
 
 
 UNIT_WHITELIST = [
-    "包","袋","箱","件","桶",
+    "包","袋","箱","件","桶","噸","盒","籃",
     "公斤","斤","公克",
     "kg","KG","Kg",
     "g","G",
-    "lb","LB","lbs"
+    "lb","LB","lbs",
+    "K","k"
 ]
 
 def edit_order(text):
