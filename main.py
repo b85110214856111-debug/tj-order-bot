@@ -3,7 +3,7 @@
 import os
 import re
 import requests
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse
 from dotenv import load_dotenv
@@ -28,6 +28,11 @@ scope = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
+
+TW = timezone(timedelta(hours=8))
+
+def now_tw():
+    return datetime.now(TW)
 
 import cloudinary
 import cloudinary.uploader
@@ -104,7 +109,7 @@ def save_photo(user_name, message_id):
     if image is None:
         return
 
-    filename = datetime.now().strftime(
+    filename = now_tw().strftime(
         "IMG_%Y%m%d_%H%M%S"
     )
 
@@ -114,8 +119,8 @@ def save_photo(user_name, message_id):
     )
 
     photo_sheet.append_row([
-        datetime.now().strftime("%m/%d"),
-        datetime.now().strftime("%H:%M:%S"),
+        now_tw().strftime("%m/%d"),
+        now_tw().strftime("%H:%M:%S"),
         user_name,
         message_id,
         url,
@@ -125,7 +130,7 @@ def save_photo(user_name, message_id):
 def upload_excel_file(wb):
 
     filename = (
-        f"orders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        f"orders_{now_tw().strftime('%Y%m%d_%H%M%S')}.xlsx"
     )
 
     tmp_path = None
@@ -162,7 +167,7 @@ def upload_excel_file(wb):
 def upload_zip(zip_bytes):
 
     filename = (
-        f"Export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        f"Export_{now_tw().strftime('%Y%m%d_%H%M%S')}.zip"
     )
 
     result = cloudinary.uploader.upload(
@@ -623,7 +628,7 @@ def create_schedule_order(text):
 
         note = note.strip()
 
-        today = datetime.now().date()
+        today = now_tw().date()
 
         
        
@@ -981,7 +986,7 @@ def create_schedule_order(text):
     if input_price is not None and input_price > 0:
         price = input_price
 
-    today = datetime.now().date()
+    today = now_tw().date()
 
     if start_next_week:
     # 下週一開始
@@ -1250,7 +1255,7 @@ def detect_delivery(text):
 
 def generate_order_ids(count):
 
-    today = datetime.now()
+    today = now_tw()
 
     roc_date = (
         f"{today.year - 1911}"
@@ -1302,7 +1307,7 @@ def save_order(data, user_id):
 
     sheet.append_row([
         oid,
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        now_tw().strftime("%Y-%m-%d %H:%M:%S"),
         data["date"],
         data["customer"],
         data["product"],
@@ -1342,7 +1347,7 @@ def save_orders_batch(
 
         rows.append([
             oid,
-            datetime.now().strftime(
+            now_tw().strftime(
                 "%Y-%m-%d %H:%M:%S"
             ),
             order["date"],
@@ -1535,7 +1540,7 @@ def delete_order(text, user_id):
     rows = sheet.get_all_values()
     deleted = 0
 
-    delete_batch = datetime.now().strftime("%Y%m%d%H%M%S")
+    delete_batch = now_tw().strftime("%Y%m%d%H%M%S")
 
     if parts[1].isdigit():
         for i in range(len(rows),1,-1):
@@ -1552,7 +1557,7 @@ def delete_order(text, user_id):
                     f"L{i}:O{i}",
                     [[
                         "已刪除",
-                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        now_tw().strftime("%Y-%m-%d %H:%M:%S"),
                         user_id,
                         delete_batch
                     ]]
@@ -1590,7 +1595,7 @@ def delete_order(text, user_id):
                     f"L{i}:O{i}",
                     [[
                         "已刪除",
-                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        now_tw().strftime("%Y-%m-%d %H:%M:%S"),
                         user_id,
                         delete_batch
                     ]]
@@ -1626,7 +1631,7 @@ def delete_order(text, user_id):
             f"L{i}:O{i}",
             [[
                 "已刪除",
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                now_tw().strftime("%Y-%m-%d %H:%M:%S"),
                 user_id,
                 delete_batch
             ]]
