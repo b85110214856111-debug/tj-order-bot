@@ -1122,7 +1122,7 @@ def edit_order(text):
         # ========= 第一行：日期 + 客戶 =========
         head = lines[0].split()
 
-        if head[0] == "改單":
+        if head and head[0].strip() == "改單":
             head = head[1:]
 
         if len(head) < 2:
@@ -1916,14 +1916,15 @@ async def callback(request: Request):
 
             continue
 
-        commands = [
-            x.strip()
-            for x in re.split(
-                r"\n\s*\n",
-                text
-            )
-            if x.strip()
-        ]
+        # 改單 / 排程類：不要拆 block
+        if text.startswith("改單") or text.startswith("刪單") or text.startswith("復原"):
+            commands = [text]
+        else:
+            commands = [
+                x.strip()
+                for x in re.split(r"\n\s*\n", text)
+                if x.strip()
+            ]
 
         results = []
 
