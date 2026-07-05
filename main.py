@@ -1145,7 +1145,13 @@ def edit_order(text):
                 continue
 
             old_product = parts[0]
-            remain = parts[1:]
+            # 第一個不是欄位名稱才當商品
+            if parts[0] in ["日期", "數量", "單價", "配送", "備註"] or parts[0].startswith("*"):
+                old_product = ""
+                remain = parts
+            else:
+                old_product = parts[0]
+                remain = parts[1:]
 
             updates = {}
 
@@ -1211,7 +1217,7 @@ def edit_order(text):
                 if r[3] != customer:
                     continue
 
-                if r[4] != old_product:
+                if old_product and r[4] != old_product:
                     continue
 
                 status = r[11] if len(r) > 11 else ""
