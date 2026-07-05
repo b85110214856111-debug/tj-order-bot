@@ -1442,7 +1442,7 @@ def parse_multi_customer_order(text):
 
     orders = []
 
-    current_date = ""
+    current_dates = []
     current_customer = ""
 
     for line in lines:
@@ -1450,22 +1450,33 @@ def parse_multi_customer_order(text):
         if not line:
             continue
 
+        # 日期分隔符統一
+        header = (
+            line.replace("、", " ")
+            .replace("，", " ")
+            .replace(",", " ")
+        )
+
         m = re.match(
-            r"^(\d{1,2}/\d{1,2})(?:\s+(.+))?$",
-            line
+            r"^((?:\d{1,2}/\d{1,2}(?:\s+)*)+)(.+)$",
+            header
         )
 
         if m:
 
-            current_date = m.group(1)
-            current_customer = m.group(2)
+            current_dates = re.findall(
+                r"\d{1,2}/\d{1,2}",
+                m.group(1)
+            )
+
+            current_customer = m.group(2).strip()
 
             continue
 
         if line.startswith("@"):
             continue
 
-        if not current_date:
+        if not current_dates:
             continue
 
         m = re.match(
@@ -1516,16 +1527,18 @@ def parse_multi_customer_order(text):
 
         note = note.strip()
 
-        orders.append({
-            "date": current_date,
-            "customer": current_customer,
-            "product": product,
-            "qty": qty,
-            "unit": unit,
-            "price": price,
-            "delivery": delivery,
-            "note": note
-        })
+        for d in current_dates:
+
+            orders.append({
+                "date": d,
+                "customer": current_customer,
+                "product": product,
+                "qty": qty,
+                "unit": unit,
+                "price": price,
+                "delivery": delivery,
+                "note": note
+            })
 
     return orders
 
