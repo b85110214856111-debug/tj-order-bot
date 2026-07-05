@@ -1925,6 +1925,14 @@ async def callback(request: Request):
 
         text = text.strip()
 
+        # 統一全形符號
+        text = (
+            text.replace("／", "/")
+                .replace("－", "-")
+                .replace("～", "~")
+                .replace("　", " ")
+        )
+
     # ============================
 
         user_id = event["source"]["userId"]
