@@ -1087,7 +1087,7 @@ def create_schedule_order(text):
         "SYSTEM"
     )
 
-    return f"✅ 已建立 {count} 筆排程"
+    return f"✅ 已建 {count} 筆排程"
 
     
 
@@ -1160,6 +1160,13 @@ def edit_order(text):
 
                 token = remain[i]
 
+                # ===== @數字 = 單價 =====
+                m = re.match(r"@(\d+(?:\.\d+)?)$", token)
+                if m:
+                    updates["單價"] = m.group(1)
+                    i += 1
+                    continue
+
                 # ===== 改商品 =====
                 if token.startswith("*"):
                     updates["商品"] = token[1:]
@@ -1167,9 +1174,9 @@ def edit_order(text):
                     continue
 
                 # ===== 單價 =====
-                if token == "單價":
+                if token == "單價" or token == "價格":
                     if i + 1 < len(remain):
-                        updates["單價"] = remain[i + 1]
+                        updates["單價"] = remain[i + 1].lstrip("@")
                     i += 2
                     continue
 
