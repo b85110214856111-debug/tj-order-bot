@@ -1138,20 +1138,14 @@ def edit_order(text):
             if not parts:
                 continue
 
-            old_product = ""
-
-            if parts:
-                first = parts[0]
-
-                # 排除控制符號
-                if first not in ["日期", "數量", "單價", "配送", "備註"] \
-                and not first.startswith(("*", "×", "+", "#", "&", "!")) \
-                and not re.match(r"\d{1,2}/\d{1,2}", first):
-
-                    old_product = first
-                    remain = parts[1:]
-                else:
-                    remain = parts
+            old_product = parts[0]
+            # 第一個不是欄位名稱才當商品
+            if parts[0] in ["日期", "數量", "單價", "配送", "備註"] or parts[0].startswith("*"):
+                old_product = ""
+                remain = parts
+            else:
+                old_product = parts[0]
+                remain = parts[1:]
 
             updates = {}
 
@@ -1250,11 +1244,8 @@ def edit_order(text):
                 if r[3] != customer:
                     continue
 
-                # 👉 有指定商品才只改單一商品
-                # 👉 沒指定商品就全部通過
-                if old_product:
-                    if r[4] != old_product:
-                        continue
+                if old_product and r[4] != old_product:
+                    continue
 
                 status = r[11] if len(r) > 11 else ""
                 if status == "已刪除":
