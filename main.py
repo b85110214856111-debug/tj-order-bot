@@ -1400,8 +1400,13 @@ def parse_order_line(line):
     if len(parts) < 4:
         return None
 
-    date = parts[0]
-    customer = parts[1]
+    if re.match(r"\d{1,2}/\d{1,2}$", parts[0]):
+        date = parts[0]
+        customer = parts[1]
+    else:
+        customer = parts[0]
+        date = parts[1]
+
     product = parts[2]
 
     qty_match = re.search(r"(\d+(?:\.\d+)?)", parts[3])
@@ -1453,24 +1458,41 @@ def parse_multi_customer_order(text):
         # 日期分隔符統一
         header = (
             line.replace("、", " ")
-            .replace("，", " ")
+        .replace("，", " ")
             .replace(",", " ")
         )
 
-        m = re.match(
-            r"^((?:\d{1,2}/\d{1,2}(?:\s+)*)+)(.+)$",
-            header
-        )
+        tokens = header.split()
 
-        if m:
+        current_dates = []
+        current_customer = ""
 
-            current_dates = re.findall(
-                r"\d{1,2}/\d{1,2}",
-                m.group(1)
-            )
+        # 日期在前
+        if tokens and re.match(r"\d{1,2}/\d{1,2}$", tokens[0]):
 
-            current_customer = m.group(2).strip()
+            i = 0
 
+            while i < len(tokens):
+
+                if re.match(r"\d{1,2}/\d{1,2}$", tokens[i]):
+                    current_dates.append(tokens[i])
+                    i += 1
+                else:
+                    break
+
+            current_customer = " ".join(tokens[i:])
+
+        # 客戶在前
+        else:
+
+            current_customer = tokens[0]
+
+            for t in tokens[1:]:
+
+                if re.match(r"\d{1,2}/\d{1,2}$", t):
+                    current_dates.append(t)
+
+        if current_dates and current_customer:
             continue
 
         if line.startswith("@"):
