@@ -1119,194 +1119,135 @@ def edit_order(text):
         if len(lines) < 2:
             continue
 
-        # =============================
-        # 第一行：日期 + 客戶 + 商品
-        # =============================
+        # =========================
+        # 1️⃣ 條件行（第一行）
+        # =========================
         head = lines[0].split()
 
         if head and head[0] == "改單":
             head = head[1:]
 
-        # =========================
-        # 抓日期
-        # =========================
-        dates = set()
+        dates = []
         rest = []
 
         for t in head:
             if re.match(r"\d{1,2}/\d{1,2}", t):
-                dates.add(t)
+                dates.append(t.strip())
             else:
                 rest.append(t)
 
-        # =========================
-        # 客戶
-        # =========================
-        customer = rest[0] if len(rest) > 0 else ""
+        customer = rest[0] if rest else ""
 
-        # =========================
-        # 商品（🔥修正核心）
-        # =========================
         product_list = [
-            x for x in rest[1:]
+            x.strip()
+            for x in rest[1:]
             if x and not re.match(r"\d{1,2}/\d{1,2}", x)
         ]
 
         has_product_filter = len(product_list) > 0
 
-        # =============================
-        # 每一行商品處理
-        # =============================
+        # =========================
+        # 2️⃣ 修改內容（第二行以後）
+        # =========================
+        updates = {}
+
         for line in lines[1:]:
 
             parts = line.split()
-            if not parts:
-                continue
-
-            old_product = parts[0]
-            remain = parts[1:] if len(parts) > 1 else []
-
-            updates = {}
-
             i = 0
-            while i < len(remain):
 
-                token = remain[i]
+            while i < len(parts):
 
-                # 單價 @80
-                m = re.match(r"@(\d+(?:\.\d+)?)$", token)
-                if m:
-                    updates["單價"] = m.group(1)
-                    i += 1
-                    continue
+                token = parts[i]
 
-                # *商品
-                if token.startswith("*"):
-                    updates["商品"] = token[1:]
-                    i += 1
-                    continue
+                # 單價 @99
+                if token.startswith("@"):
+                    m = re.match(r"@(\d+(?:\.\d+)?)", token)
+                    if m:
+                        updates["單價"] = m.group(1)
 
-                # 單價
-                if token in ["單價", "價格"]:
-                    if i + 1 < len(remain):
-                        updates["單價"] = remain[i + 1].lstrip("@")
-                    i += 2
-                    continue
+                # #日期改值
+                elif token.startswith("#"):
+                    updates["日期"] = token[1:]
 
                 # ×數量
-                if token.startswith("×"):
-                    value = token[1:]
-                    if not value and i + 1 < len(remain):
-                        value = remain[i + 1]
+                elif token.startswith("×"):
+                    v = token[1:]
+                    if not v and i + 1 < len(parts):
                         i += 1
-
-                    m = re.match(r"(\d+(?:\.\d+)?)", value)
-                    if m:
-                        updates["數量"] = m.group(1)
-
-                    i += 1
-                    continue
+                        v = parts[i]
+                    if re.match(r"\d+(\.\d+)?", v):
+                        updates["數量"] = v
 
                 # +配送
-                if token.startswith("+"):
-                    value = token[1:]
-                    if not value and i + 1 < len(remain):
-                        value = remain[i + 1]
+                elif token.startswith("+"):
+                    v = token[1:]
+                    if not v and i + 1 < len(parts):
                         i += 1
-
-                    updates["配送"] = value
-                    i += 1
-                    continue
-
-                # #日期
-                if token.startswith("#"):
-                    value = token[1:]
-                    if not value and i + 1 < len(remain):
-                        value = remain[i + 1]
-                        i += 1
-
-                    updates["日期"] = value
-                    i += 1
-                    continue
+                        v = parts[i]
+                    updates["配送"] = v
 
                 # &單位
-                if token.startswith("&"):
-                    value = token[1:]
-                    if not value and i + 1 < len(remain):
-                        value = remain[i + 1]
-                        i += 1
-
-                    updates["單位"] = value
-                    i += 1
-                    continue
+                elif token.startswith("&"):
+                    v = token[1:]
+                    updates["單位"] = v
 
                 # !備註
-                if token.startswith("!"):
-                    value = token[1:]
-                    if not value:
-                        value = " ".join(remain[i + 1:])
-                        i = len(remain)
-
-                    updates["備註"] = value
-                    i += 1
-                    continue
+                elif token.startswith("!"):
+                    v = token[1:]
+                    if not v:
+                        v = " ".join(parts[i+1:])
+                    updates["備註"] = v
 
                 i += 1
 
-            # =============================
-            # 套用 sheet（🔥核心修正區）
-            # =============================
-            for row_no, r in enumerate(rows[1:], start=2):
+        # =========================
+        # 3️⃣ 套用更新
+        # =========================
+        for row_no, r in enumerate(rows[1:], start=2):
 
-                if len(r) < 5:
+            sheet_date = str(r[2]).strip()
+            sheet_customer = str(r[3]).strip()
+            sheet_product = str(r[4]).strip()
+
+            # 日期條件
+            if dates and sheet_date not in dates:
+                continue
+
+            # 客戶條件
+            if customer and customer not in sheet_customer:
+                continue
+
+            # 商品條件（沒填 = 全部）
+            if has_product_filter:
+                if not any(p in sheet_product for p in product_list):
                     continue
 
-                sheet_date = str(r[2]).strip()
-                sheet_customer = str(r[3]).strip()
-                sheet_product = str(r[4]).strip()
+            # =====================
+            # 更新欄位
+            # =====================
+            if "日期" in updates:
+                sheet.update_cell(row_no, 3, updates["日期"])
 
-                # 日期比對
-                def norm_date(d):
-                    return d.replace("0", "").strip()
+            if "商品" in updates:
+                sheet.update_cell(row_no, 5, updates["商品"])
 
-                if not any(norm_date(sheet_date) == norm_date(d) for d in dates):
-                    continue
+            if "數量" in updates:
+                sheet.update_cell(row_no, 6, updates["數量"])
 
-                # 客戶比對
-                if customer and customer not in sheet_customer:
-                    continue
+            if "單位" in updates:
+                sheet.update_cell(row_no, 7, updates["單位"])
 
-                # =========================
-                # 商品比對（🔥修正重點）
-                # =========================
-                if has_product_filter:
-                    if not any(p in sheet_product for p in product_list):
-                        continue
-                # 沒指定商品 → 全部通過
+            if "單價" in updates:
+                sheet.update_cell(row_no, 8, updates["單價"])
 
-                # 更新
-                if "日期" in updates:
-                    sheet.update_cell(row_no, 3, updates["日期"])
+            if "配送" in updates:
+                sheet.update_cell(row_no, 9, updates["配送"])
 
-                if "商品" in updates:
-                    sheet.update_cell(row_no, 5, updates["商品"])
+            if "備註" in updates:
+                sheet.update_cell(row_no, 10, updates["備註"])
 
-                if "數量" in updates:
-                    sheet.update_cell(row_no, 6, updates["數量"])
-
-                if "單位" in updates:
-                    sheet.update_cell(row_no, 7, updates["單位"])
-
-                if "單價" in updates:
-                    sheet.update_cell(row_no, 8, updates["單價"])
-
-                if "配送" in updates:
-                    sheet.update_cell(row_no, 9, updates["配送"])
-
-                if "備註" in updates:
-                    sheet.update_cell(row_no, 10, updates["備註"])
-
-                updated_total += 1
+            updated_total += 1
 
     if updated_total == 0:
         return "❌ 找不到符合訂單"
