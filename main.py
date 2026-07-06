@@ -1098,7 +1098,7 @@ def edit_order(text):
 
     rows = sheet.get_all_values()
     text = text.strip()
-    text = normalize_symbols(text) 
+    text = normalize_symbols(text)
 
     blocks = [
         b.strip()
@@ -1119,19 +1119,29 @@ def edit_order(text):
         if len(lines) < 2:
             continue
 
-        # ========= 第一行：日期 + 客戶 =========
+        # =============================
+        # 第一行：日期 + 客戶 + 商品
+        # =============================
         head = lines[0].split()
 
-        if head and head[0].strip() == "改單":
+        if head and head[0] == "改單":
             head = head[1:]
 
         if len(head) < 2:
             return "❌ 格式錯誤（日期/客戶）"
 
+        # ===== 多日期 =====
         dates = set(re.findall(r"\d{1,2}/\d{1,2}", " ".join(head)))
+
         customer = head[1]
 
-        # ========= 每一行商品 =========
+        # ===== 支援多商品 =====
+        old_product_raw = head[2:] if len(head) > 2 else []
+        product_list = old_product_raw  # list
+
+        # =============================
+        # 每一行商品處理
+        # =============================
         for line in lines[1:]:
 
             parts = line.split()
@@ -1139,13 +1149,7 @@ def edit_order(text):
                 continue
 
             old_product = parts[0]
-            # 第一個不是欄位名稱才當商品
-            if parts[0] in ["日期", "數量", "單價", "配送", "備註"] or parts[0].startswith("*"):
-                old_product = ""
-                remain = parts
-            else:
-                old_product = parts[0]
-                remain = parts[1:]
+            remain = parts[1:] if len(parts) > 1 else []
 
             updates = {}
 
@@ -1154,27 +1158,35 @@ def edit_order(text):
 
                 token = remain[i]
 
-                # ===== @數字 = 單價 =====
+                # =========================
+                # @80 = 單價
+                # =========================
                 m = re.match(r"@(\d+(?:\.\d+)?)$", token)
                 if m:
                     updates["單價"] = m.group(1)
                     i += 1
                     continue
 
-                # ===== 改商品 =====
+                # =========================
+                # *商品
+                # =========================
                 if token.startswith("*"):
                     updates["商品"] = token[1:]
                     i += 1
                     continue
 
-                # ===== 單價 =====
-                if token == "單價" or token == "價格":
+                # =========================
+                # 單價
+                # =========================
+                if token in ["單價", "價格"]:
                     if i + 1 < len(remain):
                         updates["單價"] = remain[i + 1].lstrip("@")
                     i += 2
                     continue
 
-                # ===== × 數量 =====
+                # =========================
+                # ×數量
+                # =========================
                 if token.startswith("×"):
                     value = token[1:]
                     if not value and i + 1 < len(remain):
@@ -1188,7 +1200,9 @@ def edit_order(text):
                     i += 1
                     continue
 
-                # ===== + 配送 =====
+                # =========================
+                # +配送
+                # =========================
                 if token.startswith("+"):
                     value = token[1:]
                     if not value and i + 1 < len(remain):
@@ -1199,7 +1213,9 @@ def edit_order(text):
                     i += 1
                     continue
 
-                # ===== # 日期 =====
+                # =========================
+                # #日期
+                # =========================
                 if token.startswith("#"):
                     value = token[1:]
                     if not value and i + 1 < len(remain):
@@ -1210,7 +1226,9 @@ def edit_order(text):
                     i += 1
                     continue
 
-                # ===== & 單位 =====
+                # =========================
+                # &單位
+                # =========================
                 if token.startswith("&"):
                     value = token[1:]
                     if not value and i + 1 < len(remain):
@@ -1221,7 +1239,9 @@ def edit_order(text):
                     i += 1
                     continue
 
-                # ===== ! 備註 =====
+                # =========================
+                # !備註
+                # =========================
                 if token.startswith("!"):
                     value = token[1:]
                     if not value:
@@ -1232,25 +1252,35 @@ def edit_order(text):
                     i += 1
                     continue
 
-            # ========= 套用到 sheet =========
+                i += 1
+
+            # =============================
+            # 套用到 sheet（核心修正區）
+            # =============================
             for row_no, r in enumerate(rows[1:], start=2):
 
                 if len(r) < 5:
                     continue
 
+                # ===== 日期匹配 =====
                 if r[2] not in dates:
                     continue
 
+                # ===== 客戶匹配 =====
                 if r[3] != customer:
                     continue
 
-                if old_product and r[4] not in old_product:
+                # ===== 商品匹配（🔥多商品核心）=====
+                if product_list and r[4] not in product_list:
                     continue
 
                 status = r[11] if len(r) > 11 else ""
                 if status == "已刪除":
                     continue
 
+                # =============================
+                # 寫入更新
+                # =============================
                 if "日期" in updates:
                     sheet.update_cell(row_no, 3, updates["日期"])
 
