@@ -1138,10 +1138,7 @@ def edit_order(text):
             if not parts:
                 continue
 
-            old_product = parts[0].strip()
-
-            if old_product in ["不指定"]:
-                old_product = ""
+            old_product = parts[0]
             # 第一個不是欄位名稱才當商品
             if parts[0] in ["日期", "數量", "單價", "配送", "備註"] or parts[0].startswith("*"):
                 old_product = ""
@@ -1247,10 +1244,8 @@ def edit_order(text):
                 if r[3] != customer:
                     continue
 
-                # 不指定舊商品 => 改該日期+客戶全部商品
-                if old_product not in [""]:
-                    if r[4] != old_product:
-                        continue
+                if old_product and r[4] != old_product:
+                    continue
 
                 status = r[11] if len(r) > 11 else ""
                 if status == "已刪除":
