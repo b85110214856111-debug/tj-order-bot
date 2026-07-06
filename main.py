@@ -2172,35 +2172,42 @@ async def callback(request: Request):
 
                 count = 0
 
-                orders = []
+                lines = [
+                    x.strip()
+                    for x in cmd.splitlines()
+                    if x.strip()
+                ]
 
-                for line in cmd.splitlines():
+                # ===== 多行訂單 =====
+                if len(lines) > 1:
 
-                    line = line.strip()
+                    orders = parse_multi_customer_order(cmd)
 
-                    if not line:
-                        continue
+                    if orders:
+                        count = save_orders_batch(
+                            orders,
+                            user_name
+                        )
 
-                    # 有商品(數量)就當單行訂單
-                    if re.search(r"\d+(?:\.\d+)?[^\d\s]+", line):
-                        data = parse_order_line(line)
+                # ===== 單行訂單 =====
+                else:
 
-                        if isinstance(data, list):
-                            orders.extend(data)
-                        elif data:
-                            orders.append(data)
-
-                # 再解析多行格式
-                orders.extend(parse_multi_customer_order(cmd))
-
-                if orders:
-                    count = save_orders_batch(orders, user_name)
+                    data = parse_order_line(lines[0])
 
                     if isinstance(data, list):
-                        count = save_orders_batch(data, user_name)
+
+                        count = save_orders_batch(
+                            data,
+                            user_name
+                        )
 
                     elif data:
-                        save_order(data, user_name)
+
+                        save_order(
+                            data,
+                            user_name
+                        )
+
                         count = 1
 
                 results.append(
