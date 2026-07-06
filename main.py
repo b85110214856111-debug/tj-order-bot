@@ -1400,21 +1400,47 @@ def parse_order_line(line):
     if len(parts) < 4:
         return None
 
+    # ===== 日期、客戶解析（支援多日期）=====
+    dates = []
+    i = 0
+
+    # 日期在前
     if re.match(r"\d{1,2}/\d{1,2}$", parts[0]):
-        date = parts[0]
-        customer = parts[1]
+
+        while i < len(parts) and re.match(r"\d{1,2}/\d{1,2}$", parts[i]):
+            dates.append(parts[i])
+            i += 1
+
+        if i >= len(parts):
+            return None
+
+        customer = parts[i]
+        i += 1
+
+    # 客戶在前
     else:
+
         customer = parts[0]
-        date = parts[1]
+        i = 1
 
-    product = parts[2]
+        while i < len(parts) and re.match(r"\d{1,2}/\d{1,2}$", parts[i]):
+            dates.append(parts[i])
+            i += 1
 
-    qty_match = re.search(r"(\d+(?:\.\d+)?)", parts[3])
+        if not dates or i >= len(parts):
+            return None
+
+    product = parts[i]
+
+    if i + 1 >= len(parts):
+        return None
+
+    qty_match = re.search(r"(\d+(?:\.\d+)?)", parts[i + 1])
     if not qty_match:
         return None
 
     qty = float(qty_match.group(1))
-    unit = parse_unit(parts[3])
+    unit = parse_unit(parts[i + 1])
 
     price_match = re.search(r"@(\d+(?:\.\d+)?)", line)
     price = float(price_match.group(1)) if price_match else 0
@@ -1430,16 +1456,21 @@ def parse_order_line(line):
         note = note.replace(p, "")
     note = note.strip()
 
-    return {
-        "date": date,
-        "customer": customer,
-        "product": product,
-        "qty": qty,
-        "unit": unit,
-        "price": price,
-        "delivery": delivery,
-        "note": note
-    }
+    orders = []
+
+    for d in dates:
+        orders.append({
+            "date": d,
+            "customer": customer,
+            "product": product,
+            "qty": qty,
+            "unit": unit,
+            "price": price,
+            "delivery": delivery,
+            "note": note
+        })
+
+    return orders if len(orders) > 1 else orders[0]
 
 def parse_multi_customer_order(text):
 
@@ -2120,13 +2151,11 @@ async def callback(request: Request):
 
                     data = parse_order_line(cmd)
 
-                    if data:
+                    if isinstance(data, list):
+                        count = save_orders_batch(data, user_name)
 
-                        save_order(
-                            data,
-                            user_name
-                        )
-
+                    elif data:
+                        save_order(data, user_name)
                         count = 1
 
                 results.append(
