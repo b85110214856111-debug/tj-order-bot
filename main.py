@@ -1131,6 +1131,7 @@ def edit_order(text):
             unit = None
             price = None
             delivery = None
+            new_date = None
             note = ""
 
             i = 0
@@ -1143,6 +1144,13 @@ def edit_order(text):
             # ===== 解析 token =====
             while i < len(parts):
                 t = parts[i]
+
+                # ===== 改日期（#7/5）=====
+                m = re.match(r"#(\d{1,2}/\d{1,2})", t)
+                if m:
+                    new_date = m.group(1)
+                    i += 1
+                    continue
 
                 # 數量
                 m = re.match(r"×?(\d+(?:\.\d+)?)", t)
@@ -1184,6 +1192,7 @@ def edit_order(text):
                 "price": price,
                 "delivery": delivery,
                 "note": note
+                "new_date": new_date
             })
 
         # =========================
@@ -1209,6 +1218,10 @@ def edit_order(text):
                 # 👉 有指定商品就只改那個
                 if u["product"] and r[4] != u["product"]:
                     continue
+
+                # ===== 改日期 =====
+                if u.get("new_date"):
+                    sheet.update_cell(row_no, 3, u["new_date"])
 
                 if u["qty"] is not None:
                     sheet.update_cell(row_no, 6, u["qty"])
