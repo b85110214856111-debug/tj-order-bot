@@ -1138,14 +1138,20 @@ def edit_order(text):
             if not parts:
                 continue
 
-            old_product = parts[0]
-            # 第一個不是欄位名稱才當商品
-            if parts[0] in ["日期", "數量", "單價", "配送", "備註"] or parts[0].startswith("*"):
-                old_product = ""
-                remain = parts
-            else:
-                old_product = parts[0]
-                remain = parts[1:]
+            old_product = ""
+
+            if parts:
+                first = parts[0]
+
+                # 排除控制符號
+                if first not in ["日期", "數量", "單價", "配送", "備註"] \
+                and not first.startswith(("*", "×", "+", "#", "&", "!")) \
+                and not re.match(r"\d{1,2}/\d{1,2}", first):
+
+                    old_product = first
+                    remain = parts[1:]
+                else:
+                    remain = parts
 
             updates = {}
 
