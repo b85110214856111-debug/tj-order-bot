@@ -1158,6 +1158,7 @@ def edit_order(text):
             i = 0
             while i < len(remain):
 
+
                 token = remain[i]
 
                 # ===== @數字 = 單價 =====
