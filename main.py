@@ -1152,6 +1152,12 @@ def edit_order(text):
                     i += 1
                     continue
 
+                # ===== 改日期（#7/5）=====
+                if t.startswith("#"):
+                    new_date = t[1:]
+                    i += 1
+                    continue
+
                 # 數量
                 m = re.match(r"×?(\d+(?:\.\d+)?)", t)
                 if m:
@@ -1222,6 +1228,10 @@ def edit_order(text):
                 # ===== 改日期 =====
                 if u.get("new_date"):
                     sheet.update_cell(row_no, 3, u["new_date"])
+
+                # ===== 改商品 =====
+                if u.get("product"):
+                    sheet.update_cell(row_no, 5, u["product"])
 
                 if u["qty"] is not None:
                     sheet.update_cell(row_no, 6, u["qty"])
