@@ -1289,6 +1289,17 @@ def detect_delivery(text):
             return d
     return ""
 
+def extract_delivery_and_clean(text):
+    delivery = ""
+
+    for d in DELIVERY_LIST:
+        if d in text:
+            delivery = d
+            text = text.replace(d, "", 1)
+            break
+
+    return delivery, text
+
 def generate_order_ids(count):
 
     today = now_tw()
@@ -1520,12 +1531,11 @@ def parse_order_line(line):
 
     remain_text = " ".join(remain)
 
-    delivery = detect_delivery(remain_text)
+    delivery, remain_text = extract_delivery_and_clean(remain_text)
 
     note = remain_text
 
-    for d in DELIVERY_LIST:
-        note = note.replace(d, "", 1)
+    
 
     note = note.strip()
 
