@@ -1098,7 +1098,7 @@ def edit_order(text):
 
     rows = sheet.get_all_values()
     text = text.strip()
-    text = normalize_symbols(text) 
+    text = normalize_symbols(text)
 
     blocks = [
         b.strip()
@@ -1119,10 +1119,10 @@ def edit_order(text):
         if len(lines) < 2:
             continue
 
-        # ========= 第一行：日期 + 客戶 =========
+        # ========= 第一行 =========
         head = lines[0].split()
 
-        if head and head[0].strip() == "改單":
+        if head and head[0] == "改單":
             head = head[1:]
 
         if len(head) < 2:
@@ -1139,12 +1139,11 @@ def edit_order(text):
                 continue
 
             old_product = parts[0]
-            # 第一個不是欄位名稱才當商品
-            if parts[0] in ["日期", "數量", "單價", "配送", "備註"] or parts[0].startswith("*"):
+
+            if old_product in ["日期", "數量", "單價", "配送", "備註"] or old_product.startswith("*"):
                 old_product = ""
                 remain = parts
             else:
-                old_product = parts[0]
                 remain = parts[1:]
 
             updates = {}
@@ -1154,103 +1153,61 @@ def edit_order(text):
 
                 token = remain[i]
 
-                # ===== @數字 = 單價 =====
-                m = re.match(r"@(\d+(?:\.\d+)?)$", token)
-                if m:
-                    updates["單價"] = m.group(1)
+                if re.match(r"@(\d+(?:\.\d+)?)$", token):
+                    updates["單價"] = token[1:]
                     i += 1
                     continue
 
-                # ===== 改商品 =====
                 if token.startswith("*"):
                     updates["商品"] = token[1:]
                     i += 1
                     continue
 
-                # ===== 單價 =====
-                if token == "單價" or token == "價格":
-                    if i + 1 < len(remain):
-                        updates["單價"] = remain[i + 1].lstrip("@")
-                    i += 2
-                    continue
-
-                # ===== × 數量 =====
                 if token.startswith("×"):
-                    value = token[1:]
-                    if not value and i + 1 < len(remain):
-                        value = remain[i + 1]
-                        i += 1
-
-                    m = re.match(r"(\d+(?:\.\d+)?)", value)
+                    m = re.match(r"×(\d+(?:\.\d+)?)", token)
                     if m:
                         updates["數量"] = m.group(1)
-
                     i += 1
                     continue
 
-                # ===== + 配送 =====
                 if token.startswith("+"):
-                    value = token[1:]
-                    if not value and i + 1 < len(remain):
-                        value = remain[i + 1]
-                        i += 1
-
-                    updates["配送"] = value
+                    updates["配送"] = token[1:]
                     i += 1
                     continue
 
-                # ===== # 日期 =====
                 if token.startswith("#"):
-                    value = token[1:]
-                    if not value and i + 1 < len(remain):
-                        value = remain[i + 1]
-                        i += 1
-
-                    updates["日期"] = value
+                    updates["日期"] = token[1:]
                     i += 1
                     continue
 
-                # ===== & 單位 =====
                 if token.startswith("&"):
-                    value = token[1:]
-                    if not value and i + 1 < len(remain):
-                        value = remain[i + 1]
-                        i += 1
-
-                    updates["單位"] = value
+                    updates["單位"] = token[1:]
                     i += 1
                     continue
 
-                # ===== ! 備註 =====
                 if token.startswith("!"):
-                    value = token[1:]
-                    if not value:
-                        value = " ".join(remain[i + 1:])
-                        i = len(remain)
+                    updates["備註"] = " ".join(remain[i:])[1:]
+                    break
 
-                    updates["備註"] = value
-                    i += 1
-                    continue
+                i += 1
 
-            # ========= 套用到 sheet =========
-            for row_no, r in enumerate(rows[1:], start=2):
+            # ========= ⭐ 正確：掃描 sheet 找 row =========
+            for row_no, r in enumerate(rows, start=1):
 
                 if len(r) < 5:
                     continue
 
-                if r[2] != date:
+                match_date = (r[2] == date)
+                match_customer = (r[3] == customer)
+                match_product = (old_product == "" or r[4] == old_product)
+
+                if not (match_date and match_customer and match_product):
                     continue
 
-                if r[3] != customer:
+                if len(r) > 11 and r[11] == "已刪除":
                     continue
 
-                if old_product and r[4] != old_product:
-                    continue
-
-                status = r[11] if len(r) > 11 else ""
-                if status == "已刪除":
-                    continue
-
+                # ========= 更新 =========
                 if "日期" in updates:
                     sheet.update_cell(row_no, 3, updates["日期"])
 
