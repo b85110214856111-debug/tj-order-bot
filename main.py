@@ -1250,9 +1250,9 @@ def edit_order(text):
                 if r[3] != customer:
                     continue
 
-                # 如果有指定商品 → 只改該商品
-                # 如果沒指定商品 → 全部都改
-                if old_product != "" and old_product is not None:
+                # 👉 有指定商品才只改單一商品
+                # 👉 沒指定商品就全部通過
+                if old_product:
                     if r[4] != old_product:
                         continue
 
