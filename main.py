@@ -433,8 +433,6 @@ def customer_setting(text):
 
     customer, product, qty_unit, price = m.groups()
 
-    product = normalize_product_name(product)
-
     rows = customer_sheet.get_all_values()
 
     for i, r in enumerate(rows[1:], start=2):
@@ -518,7 +516,7 @@ def create_schedule_order(text):
 
 
         # 使用者有輸入商品
-        product = normalize_product_name(parts[1]) if len(parts) >= 2 else ""
+        product = parts[1] if len(parts) >= 2 else ""
 
 
         # 先保留輸入值
@@ -838,7 +836,7 @@ def create_schedule_order(text):
 
     if len(parts) >= 2:
         if parts[1] not in DELIVERY_LIST:
-            product = normalize_product_name(parts[1])
+            product = parts[1]
     # 數量
     for p in parts[1:]:
 
@@ -1147,13 +1145,13 @@ def edit_order(text):
             if not parts:
                 continue
 
-            old_product = normalize_product_name(parts[0])
+            old_product = parts[0]
             # 第一個不是欄位名稱才當商品
             if parts[0] in ["日期", "數量", "單價", "配送", "備註"] or parts[0].startswith("*"):
                 old_product = ""
                 remain = parts
             else:
-                old_product = normalize_product_name(parts[0])
+                old_product = parts[0]
                 remain = parts[1:]
 
             updates = {}
@@ -1172,7 +1170,7 @@ def edit_order(text):
 
                 # ===== 改商品 =====
                 if token.startswith("*"):
-                    updates["商品"] = normalize_product_name(token[1:])
+                    updates["商品"] = token[1:]
                     i += 1
                     continue
 
@@ -1262,15 +1260,6 @@ def edit_order(text):
 
     return f"✅ 已改 {updated_total} 筆"
 
-def normalize_product_name(name):
-
-    return (
-        name.strip()
-            .replace("（", "(")
-            .replace("）", ")")
-            .replace("／", "/")
-    )
-
 def parse_unit(text):
 
     for u in sorted(
@@ -1284,25 +1273,10 @@ def parse_unit(text):
     return "件"
 
 def detect_delivery(text):
-    text = text.replace("　", " ")
-    text = re.sub(r"\s+", " ", text)
-
-    for d in DELIVERY_LIST:
-        if re.search(rf"(^| ){re.escape(d)}( |$)", text):
-            return d
-
-    return ""
-
-def extract_delivery_and_clean(text):
-    delivery = ""
-
     for d in DELIVERY_LIST:
         if d in text:
-            delivery = d
-            text = text.replace(d, "", 1)
-            break
-
-    return delivery, text
+            return d
+    return ""
 
 def generate_order_ids(count):
 
@@ -1356,10 +1330,6 @@ def save_order(data, user_id):
 
     seq_no = oid[-3:]
 
-    data["product"] = normalize_product_name(
-        data["product"]
-    )
-
     sheet.append_row([
         oid,
         now_tw().strftime("%Y-%m-%d %H:%M:%S"),
@@ -1393,15 +1363,11 @@ def save_orders_batch(
         len(orders)
     )
 
-    
-
     for oid, order in zip(
         order_ids,
         orders
     ):
-        order["product"] = normalize_product_name(
-            order["product"]
-        )
+
         seq_no = oid[-3:]
 
         rows.append([
@@ -1469,103 +1435,81 @@ def is_header_line(line):
     return False
 
 def parse_order_line(line):
-
-    import re
-
-    original = line.strip()
-    if not original:
+    parts = line.split()
+    if len(parts) < 4:
         return None
 
-    # ========= 前處理 =========
-    line = re.sub(r"\s+", " ", line)
-    line = line.replace("(", "（").replace(")", "）")
-
-    tokens = line.split()
-    if len(tokens) < 3:
-        return None
-
-    # ========= 初始化 =========
+    # ===== 日期、客戶解析（支援多日期）=====
     dates = []
-    delivery = ""
-    price = 0
-    qty = 0
-    unit = "件"
+    i = 0
 
-    customer = ""
-    product = ""
+    # 日期在前
+    if re.match(r"\d{1,2}/\d{1,2}$", parts[0]):
 
-    used_index = set()
+        while i < len(parts) and re.match(r"\d{1,2}/\d{1,2}$", parts[i]):
+            dates.append(parts[i])
+            i += 1
 
-    # ========= 1. 抽日期 =========
-    for i, t in enumerate(tokens):
-        if re.match(r"\d{1,2}/\d{1,2}$", t):
-            dates.append(t)
-            used_index.add(i)
+        if i >= len(parts):
+            return None
 
-    # ========= 2. 抽配送 =========
-    for i, t in enumerate(tokens):
-        if t in DELIVERY_LIST:
-            delivery = t
-            used_index.add(i)
+        customer = parts[i]
+        i += 1
 
-    # ========= 3. 抽單價 =========
-    for i, t in enumerate(tokens):
-        m = re.match(r"@(\d+(?:\.\d+)?)", t)
-        if m:
-            price = float(m.group(1))
-            used_index.add(i)
+    # 客戶在前
+    else:
 
-    # ========= 4. 抽數量 =========
-    for i, t in enumerate(tokens):
-        m = re.match(r"(\d+(?:\.\d+)?)([^\d]*)", t)
-        if m:
-            qty = float(m.group(1))
-            if m.group(2):
-                unit = parse_unit(m.group(2))
-            used_index.add(i)
+        customer = parts[0]
+        i = 1
+
+        while i < len(parts) and re.match(r"\d{1,2}/\d{1,2}$", parts[i]):
+            dates.append(parts[i])
+            i += 1
+
+        if not dates or i >= len(parts):
+            return None
+
+    product = parts[i]
+
+    if i + 1 >= len(parts):
+        return None
+
+    qty_match = re.search(r"(\d+(?:\.\d+)?)", parts[i + 1])
+    if not qty_match:
+        return None
+
+    qty = float(qty_match.group(1))
+    unit = parse_unit(parts[i + 1])
+
+    price_match = re.search(r"@(\d+(?:\.\d+)?)", line)
+    price = float(price_match.group(1)) if price_match else 0
+
+    # ===== 配送、備註 =====
+
+    # 找價格(@)的位置
+    price_index = None
+    for j in range(i + 2, len(parts)):
+        if parts[j].startswith("@"):
+            price_index = j
             break
 
-    # ========= 5. 剩下 token（關鍵：不再 replace） =========
-    remain = [
-        t for i, t in enumerate(tokens)
-        if i not in used_index
-    ]
+    # 取得價格後面的所有內容
+    if price_index is None:
+        remain = parts[i + 2:]
+    else:
+        remain = parts[price_index + 1:]
 
-    # ========= 6. 判斷客戶 / 商品 =========
-    # 規則：
-    # - 第一個非配送/非日期 → 客戶
-    # - 最後一個 → 商品
+    remain_text = " ".join(remain)
 
-    filtered = [
-        t for t in remain
-        if t not in DELIVERY_LIST
-        and not re.match(r"\d{1,2}/\d{1,2}", t)
-    ]
+    delivery = detect_delivery(remain_text)
 
-    if filtered:
-        customer = filtered[0]
+    note = remain_text
 
-    if len(filtered) >= 2:
-        product = normalize_product_name(filtered[-1])
-    elif len(filtered) == 1:
-        product = normalize_product_name(filtered[0])
+    for d in DELIVERY_LIST:
+        note = note.replace(d, "", 1)
 
-    # ========= 7. 備註（真正安全版） =========
-    note_tokens = [
-        t for t in filtered
-        if t != customer and t != product
-    ]
+    note = note.strip()
 
-    note = " ".join(note_tokens)
-
-    # 清理雜訊（不碰 replace 原字）
-    note = re.sub(r"@\d+(?:\.\d+)?", "", note)
-    note = re.sub(r"\d+(?:\.\d+)?(件|包|袋|箱|桶|盒|斤|公斤|g|kg)?", "", note)
-    note = note.replace("（", "").replace("）", "")
-    note = note.replace("(", "").replace(")", "")
-    note = re.sub(r"\s+", " ", note).strip()
-
-    # ========= 8. 回傳 =========
     orders = []
 
     for d in dates:
@@ -1580,7 +1524,7 @@ def parse_order_line(line):
             "note": note
         })
 
-    return orders if len(orders) > 1 else (orders[0] if orders else None)
+    return orders if len(orders) > 1 else orders[0]
 
 def parse_multi_customer_order(text):
 
@@ -1668,9 +1612,7 @@ def parse_multi_customer_order(text):
         if not m:
             continue
 
-        product = normalize_product_name(
-            m.group(1)
-        )
+        product = m.group(1).strip()
 
         qty = float(m.group(2))
 
@@ -1726,9 +1668,7 @@ def parse_multi_customer_order(text):
     return orders
 
 def query_order(text):
-    keyword = normalize_product_name(
-        text.replace("查詢", "").strip()
-    )
+    keyword = text.replace("查詢", "").strip()
     result = []
 
     for r in sheet.get_all_values()[1:]:
@@ -1793,11 +1733,7 @@ def delete_order(text, user_id):
     others = [x for x in parts[1:] if not re.match(r"\d{1,2}/\d{1,2}", x)]
 
     customer = others[0] if len(others) >= 1 else ""
-    product = (
-        normalize_product_name(others[1])
-        if len(others) >= 2
-        else ""
-    )
+    product = others[1] if len(others) >= 2 else ""
 
 # 不允許只輸入客戶
     if not dates:
@@ -1922,11 +1858,7 @@ def restore_order(text):
     ]
 
     customer = others[0] if len(others) >= 1 else ""
-    product = (
-        normalize_product_name(others[1])
-        if len(others) >= 2
-        else ""
-    )
+    product = others[1] if len(others) >= 2 else ""
 
     if not dates:
         return "❌ 僅支援：復原 單號、復原 日期、復原 日期 客戶"
