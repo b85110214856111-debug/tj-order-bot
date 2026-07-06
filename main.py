@@ -1120,7 +1120,7 @@ def edit_order(text):
             continue
 
         # =========================
-        # 1️⃣ 條件行（第一行）
+        # 1️⃣ 條件行
         # =========================
         head = lines[0].split()
 
@@ -1138,16 +1138,16 @@ def edit_order(text):
 
         customer = rest[0] if rest else ""
 
-        product_list = [
+        product_filter = [
             x.strip()
             for x in rest[1:]
             if x and not re.match(r"\d{1,2}/\d{1,2}", x)
         ]
 
-        has_product_filter = len(product_list) > 0
+        has_product_filter = len(product_filter) > 0
 
         # =========================
-        # 2️⃣ 修改內容（第二行以後）
+        # 2️⃣ 修改內容解析
         # =========================
         updates = {}
 
@@ -1160,17 +1160,21 @@ def edit_order(text):
 
                 token = parts[i]
 
-                # 單價 @99
+                # ===== 單價 =====
                 if token.startswith("@"):
                     m = re.match(r"@(\d+(?:\.\d+)?)", token)
                     if m:
                         updates["單價"] = m.group(1)
 
-                # #日期改值
+                # ===== 改日期 =====
                 elif token.startswith("#"):
                     updates["日期"] = token[1:]
 
-                # ×數量
+                # ===== 改商品（🔥重點）=====
+                elif token.startswith("*"):
+                    updates["商品"] = token[1:]
+
+                # ===== 數量 =====
                 elif token.startswith("×"):
                     v = token[1:]
                     if not v and i + 1 < len(parts):
@@ -1179,7 +1183,7 @@ def edit_order(text):
                     if re.match(r"\d+(\.\d+)?", v):
                         updates["數量"] = v
 
-                # +配送
+                # ===== 配送 =====
                 elif token.startswith("+"):
                     v = token[1:]
                     if not v and i + 1 < len(parts):
@@ -1187,12 +1191,11 @@ def edit_order(text):
                         v = parts[i]
                     updates["配送"] = v
 
-                # &單位
+                # ===== 單位 =====
                 elif token.startswith("&"):
-                    v = token[1:]
-                    updates["單位"] = v
+                    updates["單位"] = token[1:]
 
-                # !備註
+                # ===== 備註 =====
                 elif token.startswith("!"):
                     v = token[1:]
                     if not v:
@@ -1218,14 +1221,14 @@ def edit_order(text):
             if customer and customer not in sheet_customer:
                 continue
 
-            # 商品條件（沒填 = 全部）
-            if has_product_filter:
-                if not any(p in sheet_product for p in product_list):
+            # 商品條件（🔥修正：如果你有要改商品，就不要被 filter 擋）
+            if has_product_filter and "商品" not in updates:
+                if not any(p in sheet_product for p in product_filter):
                     continue
 
-            # =====================
-            # 更新欄位
-            # =====================
+            # =========================
+            # 寫入更新
+            # =========================
             if "日期" in updates:
                 sheet.update_cell(row_no, 3, updates["日期"])
 
