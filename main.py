@@ -1262,25 +1262,39 @@ def edit_order(text):
                 if len(r) < 5:
                     continue
 
-                # ===== 日期匹配 =====
-                if r[2] not in dates:
+                sheet_date = str(r[2]).strip()
+                sheet_customer = str(r[3]).strip()
+                sheet_product = str(r[4]).strip()
+
+    # =========================
+    # 日期比對（🔥修正：支援模糊格式）
+    # =========================
+                def norm_date(d):
+                    return d.replace("0", "").strip()
+
+                if not any(norm_date(sheet_date) == norm_date(d) for d in dates):
                     continue
 
-                # ===== 客戶匹配 =====
-                if r[3] != customer:
+    # =========================
+    # 客戶比對（🔥改成 contains）
+    # =========================
+                if customer and customer not in sheet_customer:
                     continue
 
-                # ===== 商品匹配（🔥多商品核心）=====
-                if product_list and r[4] not in product_list:
-                    continue
+    # =========================
+    # 商品比對（🔥只有在有指定才限制）
+    # =========================
+                if product_list:
+                    if sheet_product not in product_list:
+                        continue
 
                 status = r[11] if len(r) > 11 else ""
                 if status == "已刪除":
                     continue
 
-                # =============================
-                # 寫入更新
-                # =============================
+    # =============================
+    # 寫入更新
+    # =============================
                 if "日期" in updates:
                     sheet.update_cell(row_no, 3, updates["日期"])
 
