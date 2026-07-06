@@ -1136,26 +1136,27 @@ def edit_order(text):
 
             i = 0
 
-            # ===== 商品判斷（支援 * 改商品）=====
-            product = None
+            # ===== 商品判斷（舊商品 + 新商品）=====
+            old_product = None
+            new_product = None
 
-            # ⭐ 先找 * 商品（最高優先）
             for i, t in enumerate(parts):
 
+                # ⭐ 新商品（*）
                 if t.startswith("*"):
-                    product = t[1:].strip()
-                    break
+                    new_product = t[1:].strip()
+                    continue
 
                 if t == "*" and i + 1 < len(parts):
-                    product = parts[i + 1].strip()
-                    break
+                    new_product = parts[i + 1].strip()
+                    continue
 
-            # ⭐ 沒有 * 才用預設
-            if not product:
-                for t in parts:
-                    if not re.match(r"[×@+#&!]", t):
-                        product = t
-                        break
+                # ⭐ 舊商品（用來找資料）
+                if not old_product and not re.match(r"[×@+#&!]", t):
+                    old_product = t
+
+            i = 1
+            
 
             # ===== 解析 token =====
             while i < len(parts):
@@ -1208,7 +1209,8 @@ def edit_order(text):
                 i += 1
 
             update_items.append({
-                "product": product,   # None = 全部
+                "product": old_product,
+                "new_product": new_product,   # None = 全部
                 "qty": qty,
                 "unit": unit,
                 "price": price,
@@ -1263,6 +1265,9 @@ def edit_order(text):
 
                 if u["note"]:
                     sheet.update_cell(row_no, 10, u["note"])
+
+                if u.get("new_product"):
+                    sheet.update_cell(row_no, 5, u["new_product"])
 
                 updated_total += 1
 
