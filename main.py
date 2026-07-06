@@ -1469,83 +1469,120 @@ def is_header_line(line):
     return False
 
 def parse_order_line(line):
-    parts = line.split()
-    if len(parts) < 4:
+    import re
+
+    original = line.strip()
+    if not original:
         return None
 
-    # ===== 日期、客戶解析（支援多日期）=====
+    # ========= 基礎清洗 =========
+    line = (
+        line.replace("／", "/")
+            .replace("－", "-")
+            .replace("～", "~")
+            .replace("　", " ")
+    )
+
+    tokens = line.split()
+    if len(tokens) < 3:
+        return None
+
+    # ========= 1. 抽日期 =========
     dates = []
-    i = 0
+    remain_tokens = []
 
-    # 日期在前
-    if re.match(r"\d{1,2}/\d{1,2}$", parts[0]):
+    for t in tokens:
+        if re.match(r"\d{1,2}/\d{1,2}$", t):
+            dates.append(t)
+        else:
+            remain_tokens.append(t)
 
-        while i < len(parts) and re.match(r"\d{1,2}/\d{1,2}$", parts[i]):
-            dates.append(parts[i])
-            i += 1
-
-        if i >= len(parts):
-            return None
-
-        customer = parts[i]
-        i += 1
-
-    # 客戶在前
-    else:
-
-        customer = parts[0]
-        i = 1
-
-        while i < len(parts) and re.match(r"\d{1,2}/\d{1,2}$", parts[i]):
-            dates.append(parts[i])
-            i += 1
-
-        if not dates or i >= len(parts):
-            return None
-
-    product = normalize_product_name(parts[i])
-
-    if i + 1 >= len(parts):
+    if not dates:
         return None
 
-    qty_match = re.search(r"(\d+(?:\.\d+)?)", parts[i + 1])
-    if not qty_match:
+    # ========= 2. 抽配送（核心修正）=========
+    delivery = ""
+    cleaned_tokens = []
+
+    for t in remain_tokens:
+        if t in DELIVERY_LIST:
+            delivery = t
+        else:
+            cleaned_tokens.append(t)
+
+    tokens = cleaned_tokens
+
+    if len(tokens) < 3:
         return None
 
-    qty = float(qty_match.group(1))
-    unit = parse_unit(parts[i + 1])
+    # ========= 3. 抽單價 =========
+    price = 0
+    new_tokens = []
 
-    price_match = re.search(r"@(\d+(?:\.\d+)?)", line)
-    price = float(price_match.group(1)) if price_match else 0
+    for t in tokens:
+        if t.startswith("@"):
+            try:
+                price = float(t[1:])
+            except:
+                pass
+        else:
+            new_tokens.append(t)
 
-    # ===== 配送、備註 =====
+    tokens = new_tokens
 
-    # 找價格(@)的位置
-    price_index = None
-    for j in range(i + 2, len(parts)):
-        if parts[j].startswith("@"):
-            price_index = j
+    # ========= 4. 抽數量 + 單位 =========
+    qty = 0
+    unit = "件"
+    qty_index = -1
+
+    for i, t in enumerate(tokens):
+        m = re.match(r"(\d+(?:\.\d+)?)([^\d]*)", t)
+        if m:
+            qty = float(m.group(1))
+            if m.group(2):
+                unit = parse_unit(m.group(2))
+            qty_index = i
             break
 
-    # 取得價格後面的所有內容
-    if price_index is None:
-        remain = parts[i + 2:]
-    else:
-        remain = parts[price_index + 1:]
+    if qty_index == -1:
+        return None
 
-    remain_text = " ".join(remain)
+    # ========= 5. 切客戶 & 商品（核心容錯）=========
+    before_qty = tokens[:qty_index]
+    after_qty = tokens[qty_index + 1:]
 
-    delivery = detect_delivery(remain_text)
+    # 客戶 + 商品容錯規則：
+    # 常見：自取 王小明 豬腳
+    # or 王小明 自取 豬腳
 
-    if delivery:
-        remain_text = remain_text.replace(delivery, "", 1)
+    all_names = before_qty + after_qty
 
-    note = remain_text
+    customer = ""
+    product = ""
 
-    
+    # 嘗試找客戶（優先不是數字/不是@）
+    for t in all_names:
+        if not re.search(r"\d", t):
+            customer = t
+            break
 
+    # 剩下當商品
+    product_candidates = [t for t in all_names if t != customer]
+
+    if product_candidates:
+        product = normalize_product_name(product_candidates[0])
+
+    # ========= 6. 清備註 =========
+    note = original
+
+    note = note.replace(customer, "")
+    note = note.replace(product, "")
+    note = note.replace(delivery, "")
+    note = re.sub(r"@\d+(?:\.\d+)?", "", note)
+    note = re.sub(r"\d+(?:\.\d+)?[^\s]*", "", note)
     note = note.strip()
 
+    # ========= 7. 回傳多日期 =========
     orders = []
 
     for d in dates:
