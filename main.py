@@ -1474,6 +1474,13 @@ def parse_order_line(line):
     original = line.strip()
     if not original:
         return None
+    # ===== STEP 2：保護括號商品 =====
+    line = re.sub(r"\s+", " ", line)
+    line = line.replace("(", "（").replace(")", "）")
+
+    tokens = line.split()
+    if len(tokens) < 3:
+        return None
 
     # ========= 基礎清洗 =========
     line = (
