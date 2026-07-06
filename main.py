@@ -1,5 +1,6 @@
 # main.py
 # LINE + FastAPI + Google Sheets 訂單系統（商用整合版）
+import cmd
 import os
 import re
 import token
@@ -2171,18 +2172,29 @@ async def callback(request: Request):
 
                 count = 0
 
-                items = parse_multi_customer_order(cmd)
+                orders = []
 
-                if items:
+                for line in cmd.splitlines():
 
-                    count = save_orders_batch(
-                        items,
-                        user_name
-                    )
+                    line = line.strip()
 
-                else:
+                    if not line:
+                        continue
 
-                    data = parse_order_line(cmd)
+                    # 有商品(數量)就當單行訂單
+                    if re.search(r"\d+(?:\.\d+)?[^\d\s]+", line):
+                        data = parse_order_line(line)
+
+                        if isinstance(data, list):
+                            orders.extend(data)
+                        elif data:
+                            orders.append(data)
+
+                # 再解析多行格式
+                orders.extend(parse_multi_customer_order(cmd))
+
+                if orders:
+                    count = save_orders_batch(orders, user_name)
 
                     if isinstance(data, list):
                         count = save_orders_batch(data, user_name)
