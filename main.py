@@ -2069,6 +2069,8 @@ async def callback(request: Request):
                 .replace("－", "-")
                 .replace("～", "~")
                 .replace("　", " ")
+                .replace("(", "（")
+                .replace(")", "）")
         )
 
     # ============================
