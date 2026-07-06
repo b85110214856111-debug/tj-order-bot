@@ -1396,6 +1396,44 @@ def save_orders_batch(
 
     return len(rows)
 
+def is_header_line(line):
+
+    line = (
+        line.replace("、", " ")
+            .replace("，", " ")
+            .replace(",", " ")
+    )
+
+    tokens = line.split()
+
+    if len(tokens) < 2:
+        return False
+
+    # 第一個是日期
+    if re.match(r"\d{1,2}/\d{1,2}$", tokens[0]):
+
+        # 找到第一個不是日期的位置
+        i = 0
+        while i < len(tokens) and re.match(r"\d{1,2}/\d{1,2}$", tokens[i]):
+            i += 1
+
+        # 只有日期+客戶
+        return i == len(tokens) - 1
+
+    # 第一個是客戶
+    if (
+        len(tokens) >= 2
+        and re.match(r"\d{1,2}/\d{1,2}$", tokens[1])
+    ):
+
+        j = 1
+        while j < len(tokens) and re.match(r"\d{1,2}/\d{1,2}$", tokens[j]):
+            j += 1
+
+        return j == len(tokens)
+
+    return False
+
 def parse_order_line(line):
     parts = line.split()
     if len(parts) < 4:
@@ -2179,7 +2217,8 @@ async def callback(request: Request):
                 ]
 
                 # ===== 多行訂單 =====
-                if len(lines) > 1:
+                # ===== 多行訂單 =====
+                if len(lines) > 1 and is_header_line(lines[0]):
 
                     orders = parse_multi_customer_order(cmd)
 
@@ -2189,22 +2228,23 @@ async def callback(request: Request):
                             user_name
                         )
 
-                # ===== 單行訂單 =====
+                # ===== 每行都是完整訂單 =====
                 else:
 
-                    data = parse_order_line(lines[0])
+                    orders = []
 
-                    if isinstance(data, list):
+                    for line in lines:
 
+                        data = parse_order_line(line)
+
+                        if isinstance(data, list):
+                            orders.extend(data)
+                        elif data:
+                            orders.append(data)
+
+                    if orders:
                         count = save_orders_batch(
-                            data,
-                            user_name
-                        )
-
-                    elif data:
-
-                        save_order(
-                            data,
+                            orders,
                             user_name
                         )
 
