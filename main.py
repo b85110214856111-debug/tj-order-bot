@@ -433,6 +433,8 @@ def customer_setting(text):
 
     customer, product, qty_unit, price = m.groups()
 
+    product = normalize_product_name(product)
+
     rows = customer_sheet.get_all_values()
 
     for i, r in enumerate(rows[1:], start=2):
@@ -516,7 +518,7 @@ def create_schedule_order(text):
 
 
         # 使用者有輸入商品
-        product = parts[1] if len(parts) >= 2 else ""
+        product = normalize_product_name(parts[1]) if len(parts) >= 2 else ""
 
 
         # 先保留輸入值
@@ -836,7 +838,7 @@ def create_schedule_order(text):
 
     if len(parts) >= 2:
         if parts[1] not in DELIVERY_LIST:
-            product = parts[1]
+            product = normalize_product_name(parts[1])
     # 數量
     for p in parts[1:]:
 
@@ -1145,13 +1147,13 @@ def edit_order(text):
             if not parts:
                 continue
 
-            old_product = parts[0]
+            old_product = normalize_product_name(parts[0])
             # 第一個不是欄位名稱才當商品
             if parts[0] in ["日期", "數量", "單價", "配送", "備註"] or parts[0].startswith("*"):
                 old_product = ""
                 remain = parts
             else:
-                old_product = parts[0]
+                old_product = normalize_product_name(parts[0])
                 remain = parts[1:]
 
             updates = {}
@@ -1170,7 +1172,7 @@ def edit_order(text):
 
                 # ===== 改商品 =====
                 if token.startswith("*"):
-                    updates["商品"] = token[1:]
+                    updates["商品"] = normalize_product_name(token[1:])
                     i += 1
                     continue
 
@@ -1260,6 +1262,15 @@ def edit_order(text):
 
     return f"✅ 已改 {updated_total} 筆"
 
+def normalize_product_name(name):
+
+    return (
+        name.strip()
+            .replace("（", "(")
+            .replace("）", ")")
+            .replace("／", "/")
+    )
+
 def parse_unit(text):
 
     for u in sorted(
@@ -1330,6 +1341,10 @@ def save_order(data, user_id):
 
     seq_no = oid[-3:]
 
+    data["product"] = normalize_product_name(
+        data["product"]
+    )
+
     sheet.append_row([
         oid,
         now_tw().strftime("%Y-%m-%d %H:%M:%S"),
@@ -1361,6 +1376,10 @@ def save_orders_batch(
 
     order_ids = generate_order_ids(
         len(orders)
+    )
+
+    order["product"] = normalize_product_name(
+        order["product"]
     )
 
     for oid, order in zip(
@@ -1469,7 +1488,7 @@ def parse_order_line(line):
         if not dates or i >= len(parts):
             return None
 
-    product = parts[i]
+    product = normalize_product_name(parts[i])
 
     if i + 1 >= len(parts):
         return None
@@ -1612,7 +1631,9 @@ def parse_multi_customer_order(text):
         if not m:
             continue
 
-        product = m.group(1).strip()
+        product = normalize_product_name(
+            m.group(1)
+        )
 
         qty = float(m.group(2))
 
@@ -1668,7 +1689,9 @@ def parse_multi_customer_order(text):
     return orders
 
 def query_order(text):
-    keyword = text.replace("查詢", "").strip()
+    keyword = normalize_product_name(
+        text.replace("查詢", "").strip()
+    )
     result = []
 
     for r in sheet.get_all_values()[1:]:
@@ -1733,7 +1756,11 @@ def delete_order(text, user_id):
     others = [x for x in parts[1:] if not re.match(r"\d{1,2}/\d{1,2}", x)]
 
     customer = others[0] if len(others) >= 1 else ""
-    product = others[1] if len(others) >= 2 else ""
+    product = (
+        normalize_product_name(others[1])
+        if len(others) >= 2
+        else ""
+    )
 
 # 不允許只輸入客戶
     if not dates:
@@ -1858,7 +1885,11 @@ def restore_order(text):
     ]
 
     customer = others[0] if len(others) >= 1 else ""
-    product = others[1] if len(others) >= 2 else ""
+    product = (
+        normalize_product_name(others[1])
+        if len(others) >= 2
+        else ""
+    )
 
     if not dates:
         return "❌ 僅支援：復原 單號、復原 日期、復原 日期 客戶"
