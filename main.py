@@ -1120,7 +1120,7 @@ def edit_order(text):
             continue
 
         # ========= 第一行 =========
-        head = lines[0].split()
+        head = lines[0].replace("改單", "").strip().split()
 
         if head and head[0] == "改單":
             head = head[1:]
@@ -1141,7 +1141,9 @@ def edit_order(text):
             old_product = ""
 
             if parts and not parts[0].startswith("@"):
-                old_product = parts[0]
+                old_product = ""
+                if parts and not parts[0].startswith("@") and not parts[0].startswith("×"):
+                    old_product = parts[0]
 
             if old_product in ["日期", "數量", "單價", "配送", "備註"] or old_product.startswith("*"):
                 old_product = ""
@@ -1197,17 +1199,24 @@ def edit_order(text):
             # ========= ⭐ 正確：掃描 sheet 找 row =========
             for row_no, r in enumerate(rows, start=1):
 
+                r = [x.strip() for x in r]
+                
                 if len(r) < 5:
                     continue
 
-                match_date = (r[2] == date)
-                match_customer = (r[3] == customer)
-                match_product = (old_product == "" or r[4].strip() == old_product.strip())
+                match_date = (r[2].strip() == date.strip())
+                match_customer = (r[3].strip() == customer.strip())
+                match_product = (
+                    old_product == "" or
+                    old_product == "全部" or
+                    r[4].strip() == old_product.strip()
+                )
 
                 if not (match_date and match_customer and match_product):
                     continue
 
-                if len(r) > 11 and r[11] == "已刪除":
+                status = r[11] if len(r) > 11 else ""
+                if status == "已刪除":
                     continue
 
                 # ========= 更新 =========
