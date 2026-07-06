@@ -1175,7 +1175,7 @@ def edit_order(text):
                     continue
 
                 # 數量
-                m = re.match(r"×?(\d+(?:\.\d+)?)", t)
+                m = re.match(r"[×x]?\s*(\d+(?:\.\d+)?)", t)
                 if m:
                     qty = float(m.group(1))
                     i += 1
@@ -1254,8 +1254,7 @@ def edit_order(text):
                 qty = u.get("qty")
 
                 if qty is not None:
-                    sheet.update_cell(row_no, 6, str(qty))
-
+                    sheet.update_cell(row_no, 6, qty)
                 # 單位
                 if u.get("unit"):
                     sheet.update_cell(row_no, 7, u["unit"])
