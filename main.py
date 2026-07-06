@@ -1095,207 +1095,197 @@ UNIT_WHITELIST = [
 ]
 
 def edit_order(text):
-    rows = sheet.get_all_values()
-    text = normalize_symbols(text.strip())
 
-    blocks = [b.strip() for b in text.split("\n\n") if b.strip()]
+    rows = sheet.get_all_values()
+    text = text.strip()
+    text = normalize_symbols(text) 
+
+    blocks = [
+        b.strip()
+        for b in text.split("\n\n")
+        if b.strip()
+    ]
+
     updated_total = 0
 
     for block in blocks:
 
-        lines = [l.strip() for l in block.split("\n") if l.strip()]
+        lines = [
+            l.strip()
+            for l in block.split("\n")
+            if l.strip()
+        ]
+
         if len(lines) < 2:
             continue
 
-        # =========================
-        # HEADER（日期 + 客戶）
-        # =========================
-        head = lines[0].replace("改單", "").strip().split()
+        # ========= 第一行：日期 + 客戶 =========
+        head = lines[0].split()
+
+        if head and head[0].strip() == "改單":
+            head = head[1:]
+
         if len(head) < 2:
-            return "❌ 格式錯誤（日期 客戶）"
+            return "❌ 格式錯誤（日期/客戶）"
 
         date = head[0]
         customer = head[1]
 
-        # =========================
-        # 解析每一行修改
-        # =========================
-        update_items = []
-
+        # ========= 每一行商品 =========
         for line in lines[1:]:
 
             parts = line.split()
             if not parts:
                 continue
 
-            old_product = None
-            new_product = None
-            qty = None
-            unit = None
-            price = None
-            delivery = None
-            new_date = None
-            note = ""
+            old_product = parts[0]
+            # 第一個不是欄位名稱才當商品
+            if parts[0] in ["日期", "數量", "單價", "配送", "備註"] or parts[0].startswith("*"):
+                old_product = ""
+                remain = parts
+            else:
+                old_product = parts[0]
+                remain = parts[1:]
 
-            # =========================
-            # 商品判斷（舊 + 新）
-            # =========================
-            for i, t in enumerate(parts):
+            updates = {}
 
-                # ⭐ 新商品 *
-                if t.startswith("*"):
-                    new_product = t[1:].strip()
-                    continue
+            i = 0
+            while i < len(remain):
 
-                if t == "*" and i + 1 < len(parts):
-                    new_product = parts[i + 1].strip()
-                    continue
+                token = remain[i]
 
-                # ⭐ 舊商品（第一個正常詞）
-                if not old_product and not re.match(r"[×@+#&!]", t):
-                    old_product = t
-
-            # =========================
-            # token 解析
-            # =========================
-            i = 1
-            while i < len(parts):
-                t = parts[i]
-
-                # 改日期
-                m = re.match(r"#(\d{1,2}/\d{1,2})", t)
+                # ===== @數字 = 單價 =====
+                m = re.match(r"@(\d+(?:\.\d+)?)$", token)
                 if m:
-                    new_date = m.group(1)
+                    updates["單價"] = m.group(1)
                     i += 1
                     continue
 
-                if t.startswith("#"):
-                    new_date = t[1:]
+                # ===== 改商品 =====
+                if token.startswith("*"):
+                    updates["商品"] = token[1:]
                     i += 1
                     continue
 
-                # 數量
-                m = re.match(r"[×x]?\s*(\d+(?:\.\d+)?)", t)
-                if m:
-                    qty = float(m.group(1))
+                # ===== 單價 =====
+                if token == "單價" or token == "價格":
+                    if i + 1 < len(remain):
+                        updates["單價"] = remain[i + 1].lstrip("@")
+                    i += 2
+                    continue
+
+                # ===== × 數量 =====
+                if token.startswith("×"):
+                    value = token[1:]
+                    if not value and i + 1 < len(remain):
+                        value = remain[i + 1]
+                        i += 1
+
+                    m = re.match(r"(\d+(?:\.\d+)?)", value)
+                    if m:
+                        updates["數量"] = m.group(1)
+
                     i += 1
                     continue
 
-                # 單價
-                m = re.match(r"@(\d+(?:\.\d+)?)", t)
-                if m:
-                    price = float(m.group(1))
+                # ===== + 配送 =====
+                if token.startswith("+"):
+                    value = token[1:]
+                    if not value and i + 1 < len(remain):
+                        value = remain[i + 1]
+                        i += 1
+
+                    updates["配送"] = value
                     i += 1
                     continue
 
-                # 配送
-                if t.startswith("+"):
-                    delivery = t[1:]
+                # ===== # 日期 =====
+                if token.startswith("#"):
+                    value = token[1:]
+                    if not value and i + 1 < len(remain):
+                        value = remain[i + 1]
+                        i += 1
+
+                    updates["日期"] = value
                     i += 1
                     continue
 
-                # 單位
-                if t.startswith("&"):
-                    unit = t[1:]
+                # ===== & 單位 =====
+                if token.startswith("&"):
+                    value = token[1:]
+                    if not value and i + 1 < len(remain):
+                        value = remain[i + 1]
+                        i += 1
+
+                    updates["單位"] = value
                     i += 1
                     continue
 
-                # 備註
-                if t.startswith("!"):
-                    note = " ".join(parts[i:])[1:]
-                    break
+                # ===== ! 備註 =====
+                if token.startswith("!"):
+                    value = token[1:]
+                    if not value:
+                        value = " ".join(remain[i + 1:])
+                        i = len(remain)
 
-                i += 1
-
-            update_items.append({
-                "old_product": old_product,
-                "new_product": new_product,
-                "qty": qty,
-                "unit": unit,
-                "price": price,
-                "delivery": delivery,
-                "note": note,
-                "new_date": new_date
-            })
-
-        # =========================
-        # 套用更新
-        # =========================
-        for row_no, r in enumerate(rows[1:], start=2):
-
-            if len(r) < 5:
-                continue
-
-            if r[2].strip() != date:
-                continue
-
-            if r[3].strip() != customer:
-                continue
-
-            status = r[11] if len(r) > 11 else ""
-            if status == "已刪除":
-                continue
-
-            for u in update_items:
-
-    # =========================
-    # ⭐ 是否為「全商品模式」
-    # =========================
-                is_all_products = not u["old_product"]
-
-    # 如果有指定舊商品 → 精準匹配
-                if not is_all_products and r[4] != u["old_product"]:
+                    updates["備註"] = value
+                    i += 1
                     continue
 
-    # =========================
-    # 改日期
-    # =========================
-                if u.get("new_date"):
-                    sheet.update_cell(row_no, 3, u["new_date"])
+            # ========= 套用到 sheet =========
+            for row_no, r in enumerate(rows[1:], start=2):
 
-    # =========================
-    # 改商品
-    # =========================
-                if u.get("new_product"):
-                    sheet.update_cell(row_no, 5, u["new_product"])
+                if len(r) < 5:
+                    continue
 
-    # =========================
-    # ⭐ 改數量（全部 or 單一）
-    # =========================
-                if u.get("qty") is not None:
-                    sheet.update_cell(row_no, 6, u["qty"])
+                if r[2] != date:
+                    continue
 
-    # =========================
-    # 單位
-    # =========================
-                if u.get("unit"):
-                    sheet.update_cell(row_no, 7, u["unit"])
+                if r[3] != customer:
+                    continue
 
-    # =========================
-    # 單價
-    # =========================
-                if u.get("price") is not None:
-                    sheet.update_cell(row_no, 8, u["price"])
+                # 不指定舊商品 => 改該日期+客戶全部商品
+                if old_product not in [""]:
+                    if r[4] != old_product:
+                        continue
 
-    # =========================
-    # 配送
-    # =========================
-                if u.get("delivery"):
-                    sheet.update_cell(row_no, 9, u["delivery"])
+                status = r[11] if len(r) > 11 else ""
+                if status == "已刪除":
+                    continue
 
-    # =========================
-    # 備註
-    # =========================
-                if u.get("note"):
-                    sheet.update_cell(row_no, 10, u["note"])
+                if "日期" in updates:
+                    sheet.update_cell(row_no, 3, updates["日期"])
+
+                if "商品" in updates:
+                    sheet.update_cell(row_no, 5, updates["商品"])
+
+                if "數量" in updates:
+                    sheet.update_cell(row_no, 6, updates["數量"])
+
+                if "單位" in updates:
+                    sheet.update_cell(row_no, 7, updates["單位"])
+
+                if "單價" in updates:
+                    sheet.update_cell(row_no, 8, updates["單價"])
+
+                if "配送" in updates:
+                    sheet.update_cell(row_no, 9, updates["配送"])
+
+                if "備註" in updates:
+                    sheet.update_cell(row_no, 10, updates["備註"])
 
                 updated_total += 1
+
+    if updated_total == 0:
+        return "❌ 找不到符合訂單"
 
     return f"✅ 已改 {updated_total} 筆"
 
 def normalize_symbols(text: str):
     table = str.maketrans({
-        "×": "x",
+        "×": "×",
+        "×": "×",
+        "＋": "+",
         "＋": "+",
         "！": "!",
         "＃": "#",
