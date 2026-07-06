@@ -1157,8 +1157,6 @@ def edit_order(text):
                         product = t
                         break
 
-            i = 1
-
             # ===== 解析 token =====
             while i < len(parts):
                 t = parts[i]
