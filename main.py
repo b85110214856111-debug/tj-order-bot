@@ -1127,17 +1127,27 @@ def edit_order(text):
         if head and head[0] == "改單":
             head = head[1:]
 
-        if len(head) < 2:
-            return "❌ 格式錯誤（日期/客戶）"
+# =========================
+# 抓日期（全部）
+# =========================
+        dates = set()
+        rest = []
 
-        # ===== 多日期 =====
-        dates = set(re.findall(r"\d{1,2}/\d{1,2}", " ".join(head)))
+        for t in head:
+            if re.match(r"\d{1,2}/\d{1,2}", t):
+                dates.add(t)
+            else:
+                rest.append(t)
 
-        customer = head[1]
+# =========================
+# 第一個非日期 = 客戶
+# =========================
+        customer = rest[0] if len(rest) > 0 else ""
 
-        # ===== 支援多商品 =====
-        old_product_raw = head[2:] if len(head) > 2 else []
-        product_list = old_product_raw  # list
+# =========================
+# 後面才是商品
+# =========================
+        product_list = rest[1:] if len(rest) > 1 else []
 
         # =============================
         # 每一行商品處理
