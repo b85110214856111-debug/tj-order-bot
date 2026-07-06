@@ -1378,15 +1378,15 @@ def save_orders_batch(
         len(orders)
     )
 
-    order["product"] = normalize_product_name(
-        order["product"]
-    )
+    
 
     for oid, order in zip(
         order_ids,
         orders
     ):
-
+        order["product"] = normalize_product_name(
+            order["product"]
+        )
         seq_no = oid[-3:]
 
         rows.append([
