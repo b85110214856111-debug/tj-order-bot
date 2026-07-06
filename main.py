@@ -1136,10 +1136,31 @@ def edit_order(text):
 
             i = 0
 
-            # ===== 商品判斷 =====
-            if not parts[0].startswith(("×", "@", "+", "#", "&", "!")):
-                product = parts[0]
-                i = 1
+            # ===== 商品判斷（支援 * 改商品）=====
+            product = None
+
+            for idx, t in enumerate(parts):
+
+                # 跳過控制符號
+                if re.match(r"[×@+#&!]", t):
+                    continue
+
+                # *豬心（緊貼）
+                if t.startswith("*"):
+                    product = t[1:].strip()
+                    break
+
+                # * 豬心（分開寫）
+                if t == "*" and idx + 1 < len(parts):
+                    product = parts[idx + 1].strip()
+                    break
+
+                # 一般商品（第一個自然詞）
+                if not product:
+                    product = t
+                    break
+
+            i = 1
 
             # ===== 解析 token =====
             while i < len(parts):
