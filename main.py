@@ -1107,7 +1107,9 @@ def edit_order(text):
         if len(lines) < 2:
             continue
 
-        # ===== header =====
+        # =========================
+        # HEADER（日期 + 客戶）
+        # =========================
         head = lines[0].replace("改單", "").strip().split()
         if len(head) < 2:
             return "❌ 格式錯誤（日期 客戶）"
@@ -1116,7 +1118,7 @@ def edit_order(text):
         customer = head[1]
 
         # =========================
-        # 解析所有商品修改行
+        # 解析每一行修改
         # =========================
         update_items = []
 
@@ -1126,7 +1128,8 @@ def edit_order(text):
             if not parts:
                 continue
 
-            product = None
+            old_product = None
+            new_product = None
             qty = None
             unit = None
             price = None
@@ -1134,15 +1137,12 @@ def edit_order(text):
             new_date = None
             note = ""
 
-            i = 0
-
-            # ===== 商品判斷（舊商品 + 新商品）=====
-            old_product = None
-            new_product = None
-
+            # =========================
+            # 商品判斷（舊 + 新）
+            # =========================
             for i, t in enumerate(parts):
 
-                # ⭐ 新商品（*）
+                # ⭐ 新商品 *
                 if t.startswith("*"):
                     new_product = t[1:].strip()
                     continue
@@ -1151,25 +1151,24 @@ def edit_order(text):
                     new_product = parts[i + 1].strip()
                     continue
 
-                # ⭐ 舊商品（用來找資料）
+                # ⭐ 舊商品（第一個正常詞）
                 if not old_product and not re.match(r"[×@+#&!]", t):
                     old_product = t
 
+            # =========================
+            # token 解析
+            # =========================
             i = 1
-            
-
-            # ===== 解析 token =====
             while i < len(parts):
                 t = parts[i]
 
-                # ===== 改日期（#7/5）=====
+                # 改日期
                 m = re.match(r"#(\d{1,2}/\d{1,2})", t)
                 if m:
                     new_date = m.group(1)
                     i += 1
                     continue
 
-                # ===== 改日期（#7/5）=====
                 if t.startswith("#"):
                     new_date = t[1:]
                     i += 1
@@ -1209,8 +1208,8 @@ def edit_order(text):
                 i += 1
 
             update_items.append({
-                "product": old_product,
-                "new_product": new_product,   # None = 全部
+                "old_product": old_product,
+                "new_product": new_product,
                 "qty": qty,
                 "unit": unit,
                 "price": price,
@@ -1227,10 +1226,10 @@ def edit_order(text):
             if len(r) < 5:
                 continue
 
-            if r[2] != date:
+            if r[2].strip() != date:
                 continue
 
-            if r[3] != customer:
+            if r[3].strip() != customer:
                 continue
 
             status = r[11] if len(r) > 11 else ""
@@ -1239,35 +1238,37 @@ def edit_order(text):
 
             for u in update_items:
 
-                # 👉 有指定商品就只改那個
-                if u["product"] and r[4] != u["product"]:
+                # 👉 用舊商品定位
+                if u["old_product"] and r[4] != u["old_product"]:
                     continue
 
-                # ===== 改日期 =====
+                # 改日期
                 if u.get("new_date"):
                     sheet.update_cell(row_no, 3, u["new_date"])
 
-                # ===== 改商品 =====
-                if u.get("product"):
-                    sheet.update_cell(row_no, 5, u["product"])
-
-                if u["qty"] is not None:
-                    sheet.update_cell(row_no, 6, u["qty"])
-
-                if u["unit"]:
-                    sheet.update_cell(row_no, 7, u["unit"])
-
-                if u["price"] is not None:
-                    sheet.update_cell(row_no, 8, u["price"])
-
-                if u["delivery"]:
-                    sheet.update_cell(row_no, 9, u["delivery"])
-
-                if u["note"]:
-                    sheet.update_cell(row_no, 10, u["note"])
-
+                # 改商品
                 if u.get("new_product"):
                     sheet.update_cell(row_no, 5, u["new_product"])
+
+                # 改數量（🔥你這次問題就在這）
+                if u.get("qty") is not None:
+                    sheet.update_cell(row_no, 6, u["qty"])
+
+                # 單位
+                if u.get("unit"):
+                    sheet.update_cell(row_no, 7, u["unit"])
+
+                # 單價
+                if u.get("price") is not None:
+                    sheet.update_cell(row_no, 8, u["price"])
+
+                # 配送
+                if u.get("delivery"):
+                    sheet.update_cell(row_no, 9, u["delivery"])
+
+                # 備註
+                if u.get("note"):
+                    sheet.update_cell(row_no, 10, u["note"])
 
                 updated_total += 1
 
