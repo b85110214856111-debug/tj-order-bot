@@ -1510,8 +1510,7 @@ def parse_multi_customer_order(text):
 
         tokens = header.split()
 
-        current_dates = []
-        current_customer = ""
+        
 
         # 日期在前
         if tokens and re.match(r"\d{1,2}/\d{1,2}$", tokens[0]):
@@ -1528,18 +1527,37 @@ def parse_multi_customer_order(text):
 
             current_customer = " ".join(tokens[i:])
 
-        # 客戶在前
-        else:
+        # 只有第一行才解析日期/客戶
+        if tokens:
 
-            current_customer = tokens[0]
+            # 日期在前
+            if re.match(r"\d{1,2}/\d{1,2}$", tokens[0]):
 
-            for t in tokens[1:]:
+                current_dates = []
 
-                if re.match(r"\d{1,2}/\d{1,2}$", t):
-                    current_dates.append(t)
+                i = 0
+                while i < len(tokens) and re.match(r"\d{1,2}/\d{1,2}$", tokens[i]):
+                    current_dates.append(tokens[i])
+                    i += 1
 
-        if current_dates and current_customer:
-            continue
+                current_customer = " ".join(tokens[i:])
+
+                continue
+
+            # 客戶在前（第二個開始有日期）
+            elif (
+                len(tokens) > 1
+                and re.match(r"\d{1,2}/\d{1,2}$", tokens[1])
+            ):
+
+                current_customer = tokens[0]
+                current_dates = []
+
+                for t in tokens[1:]:
+                    if re.match(r"\d{1,2}/\d{1,2}$", t):
+                        current_dates.append(t)
+
+                continue
 
         if line.startswith("@"):
             continue
