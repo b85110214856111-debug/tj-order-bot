@@ -1285,9 +1285,12 @@ def parse_unit(text):
 
 def detect_delivery(text):
     text = text.replace("　", " ")
+    text = re.sub(r"\s+", " ", text)
+
     for d in DELIVERY_LIST:
-        if re.search(rf"\b{re.escape(d)}\b", text):
+        if re.search(rf"(^| ){re.escape(d)}( |$)", text):
             return d
+
     return ""
 
 def extract_delivery_and_clean(text):
