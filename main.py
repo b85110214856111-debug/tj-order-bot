@@ -1106,6 +1106,7 @@ def edit_order(text):
 
     rows = sheet.get_all_values()
     text = text.strip()
+    text = normalize_symbols(text) 
 
     blocks = [
         b.strip()
@@ -1285,6 +1286,18 @@ def edit_order(text):
         return "❌ 找不到符合訂單"
 
     return f"✅ 已改 {updated_total} 筆"
+
+def normalize_symbols(text: str):
+    table = str.maketrans({
+        "×": "×",
+        "×": "×",
+        "＋": "+",
+        "＋": "+",
+        "！": "!",
+        "＃": "#",
+        "＆": "&"
+    })
+    return text.translate(table)
 
 def parse_unit(text):
 
