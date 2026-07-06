@@ -1582,12 +1582,23 @@ def parse_order_line(line):
     # ========= 6. 清備註 =========
     note = original
 
-    note = note.replace(customer, "")
-    note = note.replace(product, "")
-    note = note.replace(delivery, "")
+    # 先移除已解析欄位
+    for x in [customer, product, delivery]:
+        if x:
+            note = note.replace(x, "")
+
+    # 移除單價
     note = re.sub(r"@\d+(?:\.\d+)?", "", note)
-    note = re.sub(r"\d+(?:\.\d+)?[^\s]*", "", note)
-    note = note.strip()
+
+    # 移除數字單位（更安全版）
+    note = re.sub(r"\d+(?:\.\d+)?(件|包|袋|箱|桶|盒|斤|公斤|g|kg)?", "", note)
+
+    # 清理括號殘留（關鍵）
+    note = note.replace("（", "").replace("）", "")
+    note = note.replace("(", "").replace(")", "")
+
+    # 多空白整理
+    note = re.sub(r"\s+", " ", note).strip()
 
     # ========= 7. 回傳多日期 =========
     orders = []
