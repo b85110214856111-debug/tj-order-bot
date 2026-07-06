@@ -1445,21 +1445,30 @@ def parse_order_line(line):
     price_match = re.search(r"@(\d+(?:\.\d+)?)", line)
     price = float(price_match.group(1)) if price_match else 0
 
-    delivery = detect_delivery(line)
+    # ===== 配送、備註 =====
 
-    note = line
-    note = re.sub(r"\d{1,2}/\d{1,2}", "", note)
-    note = re.sub(r"@\d+(?:\.\d+)?", "", note)
+    # 找價格(@)的位置
+    price_index = None
+    for j in range(i + 2, len(parts)):
+        if parts[j].startswith("@"):
+            price_index = j
+            break
+
+    # 取得價格後面的所有內容
+    if price_index is None:
+        remain = parts[i + 2:]
+    else:
+        remain = parts[price_index + 1:]
+
+    remain_text = " ".join(remain)
+
+    delivery = detect_delivery(remain_text)
+
+    note = remain_text
+
     for d in DELIVERY_LIST:
-        note = note.replace(d, "")
-    # 移除日期
-    for d in dates:
         note = note.replace(d, "", 1)
 
-    # 移除客戶、商品、數量
-    note = note.replace(customer, "", 1)
-    note = note.replace(product, "", 1)
-    note = note.replace(parts[i + 1], "", 1)
     note = note.strip()
 
     orders = []
