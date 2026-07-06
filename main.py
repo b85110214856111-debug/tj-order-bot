@@ -1251,8 +1251,10 @@ def edit_order(text):
                     sheet.update_cell(row_no, 5, u["new_product"])
 
                 # 改數量（🔥你這次問題就在這）
-                if u.get("qty") is not None:
-                    sheet.update_cell(row_no, 6, u["qty"])
+                qty = u.get("qty")
+
+                if qty is not None:
+                    sheet.update_cell(row_no, 6, str(qty))
 
                 # 單位
                 if u.get("unit"):
