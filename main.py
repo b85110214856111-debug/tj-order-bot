@@ -1284,8 +1284,9 @@ def parse_unit(text):
     return "件"
 
 def detect_delivery(text):
+    text = text.replace("　", " ")
     for d in DELIVERY_LIST:
-        if d in text:
+        if re.search(rf"\b{re.escape(d)}\b", text):
             return d
     return ""
 
@@ -1531,7 +1532,10 @@ def parse_order_line(line):
 
     remain_text = " ".join(remain)
 
-    delivery, remain_text = extract_delivery_and_clean(remain_text)
+    delivery = detect_delivery(remain_text)
+
+    if delivery:
+        remain_text = remain_text.replace(delivery, "", 1)
 
     note = remain_text
 
