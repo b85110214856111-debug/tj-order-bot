@@ -1469,12 +1469,14 @@ def is_header_line(line):
     return False
 
 def parse_order_line(line):
+
     import re
 
     original = line.strip()
     if not original:
         return None
-    # ===== STEP 2：保護括號商品 =====
+
+    # ========= 前處理 =========
     line = re.sub(r"\s+", " ", line)
     line = line.replace("(", "（").replace(")", "）")
 
@@ -1482,125 +1484,88 @@ def parse_order_line(line):
     if len(tokens) < 3:
         return None
 
-    # ========= 基礎清洗 =========
-    line = (
-        line.replace("／", "/")
-            .replace("－", "-")
-            .replace("～", "~")
-            .replace("　", " ")
-    )
-
-    tokens = line.split()
-    if len(tokens) < 3:
-        return None
-
-    # ========= 1. 抽日期 =========
+    # ========= 初始化 =========
     dates = []
-    remain_tokens = []
-
-    for t in tokens:
-        if re.match(r"\d{1,2}/\d{1,2}$", t):
-            dates.append(t)
-        else:
-            remain_tokens.append(t)
-
-    if not dates:
-        return None
-
-    # ========= 2. 抽配送（核心修正）=========
     delivery = ""
-    cleaned_tokens = []
-
-    for t in remain_tokens:
-        if t in DELIVERY_LIST:
-            delivery = t
-        else:
-            cleaned_tokens.append(t)
-
-    tokens = cleaned_tokens
-
-    if len(tokens) < 3:
-        return None
-
-    # ========= 3. 抽單價 =========
     price = 0
-    new_tokens = []
-
-    for t in tokens:
-        if t.startswith("@"):
-            try:
-                price = float(t[1:])
-            except:
-                pass
-        else:
-            new_tokens.append(t)
-
-    tokens = new_tokens
-
-    # ========= 4. 抽數量 + 單位 =========
     qty = 0
     unit = "件"
-    qty_index = -1
 
+    customer = ""
+    product = ""
+
+    used_index = set()
+
+    # ========= 1. 抽日期 =========
+    for i, t in enumerate(tokens):
+        if re.match(r"\d{1,2}/\d{1,2}$", t):
+            dates.append(t)
+            used_index.add(i)
+
+    # ========= 2. 抽配送 =========
+    for i, t in enumerate(tokens):
+        if t in DELIVERY_LIST:
+            delivery = t
+            used_index.add(i)
+
+    # ========= 3. 抽單價 =========
+    for i, t in enumerate(tokens):
+        m = re.match(r"@(\d+(?:\.\d+)?)", t)
+        if m:
+            price = float(m.group(1))
+            used_index.add(i)
+
+    # ========= 4. 抽數量 =========
     for i, t in enumerate(tokens):
         m = re.match(r"(\d+(?:\.\d+)?)([^\d]*)", t)
         if m:
             qty = float(m.group(1))
             if m.group(2):
                 unit = parse_unit(m.group(2))
-            qty_index = i
+            used_index.add(i)
             break
 
-    if qty_index == -1:
-        return None
+    # ========= 5. 剩下 token（關鍵：不再 replace） =========
+    remain = [
+        t for i, t in enumerate(tokens)
+        if i not in used_index
+    ]
 
-    # ========= 5. 切客戶 & 商品（核心容錯）=========
-    before_qty = tokens[:qty_index]
-    after_qty = tokens[qty_index + 1:]
+    # ========= 6. 判斷客戶 / 商品 =========
+    # 規則：
+    # - 第一個非配送/非日期 → 客戶
+    # - 最後一個 → 商品
 
-    # 客戶 + 商品容錯規則：
-    # 常見：自取 王小明 豬腳
-    # or 王小明 自取 豬腳
+    filtered = [
+        t for t in remain
+        if t not in DELIVERY_LIST
+        and not re.match(r"\d{1,2}/\d{1,2}", t)
+    ]
 
-    all_names = before_qty + after_qty
+    if filtered:
+        customer = filtered[0]
 
-    customer = ""
-    product = ""
+    if len(filtered) >= 2:
+        product = normalize_product_name(filtered[-1])
+    elif len(filtered) == 1:
+        product = normalize_product_name(filtered[0])
 
-    # 嘗試找客戶（優先不是數字/不是@）
-    for t in all_names:
-        if not re.search(r"\d", t):
-            customer = t
-            break
+    # ========= 7. 備註（真正安全版） =========
+    note_tokens = [
+        t for t in filtered
+        if t != customer and t != product
+    ]
 
-    # 剩下當商品
-    product_candidates = [t for t in all_names if t != customer]
+    note = " ".join(note_tokens)
 
-    if product_candidates:
-        product = normalize_product_name(product_candidates[0])
-
-    # ========= 6. 清備註 =========
-    note = original
-
-    # 先移除已解析欄位
-    for x in [customer, product, delivery]:
-        if x:
-            note = note.replace(x, "")
-
-    # 移除單價
+    # 清理雜訊（不碰 replace 原字）
     note = re.sub(r"@\d+(?:\.\d+)?", "", note)
-
-    # 移除數字單位（更安全版）
     note = re.sub(r"\d+(?:\.\d+)?(件|包|袋|箱|桶|盒|斤|公斤|g|kg)?", "", note)
-
-    # 清理括號殘留（關鍵）
     note = note.replace("（", "").replace("）", "")
     note = note.replace("(", "").replace(")", "")
-
-    # 多空白整理
     note = re.sub(r"\s+", " ", note).strip()
 
-    # ========= 7. 回傳多日期 =========
+    # ========= 8. 回傳 =========
     orders = []
 
     for d in dates:
@@ -1615,7 +1580,7 @@ def parse_order_line(line):
             "note": note
         })
 
-    return orders if len(orders) > 1 else orders[0]
+    return orders if len(orders) > 1 else (orders[0] if orders else None)
 
 def parse_multi_customer_order(text):
 
