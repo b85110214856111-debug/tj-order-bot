@@ -501,18 +501,14 @@ def create_schedule_order(text):
 
         parts = order_text.split()
 
-        customer = parts[0]
+        customer = parts[0].strip()
 
         rows = customer_sheet.get_all_values()
 
-        customer_rows = []
-
-        for r in rows[1:]:
-            if r[0] == customer:
-                customer_rows.append(r)
-
-        if not customer_rows:
-            return "❌ 客戶未設定"
+        customer_rows = [
+            r for r in rows[1:]
+            if r[0] == customer
+        ] if customer else []
 
 
         # 使用者有輸入商品
@@ -726,10 +722,14 @@ def create_schedule_order(text):
 
         if not product:
 
-            customer_rows = [
-                r for r in rows[1:]
-                if r[0] == customer
-            ]
+            # ⭐ 沒有客戶 → 全部客戶都排
+            if not customer:
+                customer_rows = rows[1:]
+            else:
+                customer_rows = [
+                    r for r in rows[1:]
+                    if r[0] == customer
+                ]
 
             for r in customer_rows:
 
