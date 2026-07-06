@@ -2246,9 +2246,7 @@ async def callback(request: Request):
                         count = save_orders_batch(
                             orders,
                             user_name
-                        )
-
-                        count = 1
+                        )                  
 
                 results.append(
                     f"✅ 已建 {count} 筆"
