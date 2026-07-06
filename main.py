@@ -1238,36 +1238,54 @@ def edit_order(text):
 
             for u in update_items:
 
-                # 👉 用舊商品定位
-                if u["old_product"] and r[4] != u["old_product"]:
+    # =========================
+    # ⭐ 是否為「全商品模式」
+    # =========================
+                is_all_products = not u["old_product"]
+
+    # 如果有指定舊商品 → 精準匹配
+                if not is_all_products and r[4] != u["old_product"]:
                     continue
 
-                # 改日期
+    # =========================
+    # 改日期
+    # =========================
                 if u.get("new_date"):
                     sheet.update_cell(row_no, 3, u["new_date"])
 
-                # 改商品
+    # =========================
+    # 改商品
+    # =========================
                 if u.get("new_product"):
                     sheet.update_cell(row_no, 5, u["new_product"])
 
-                # 改數量（🔥你這次問題就在這）
-                qty = u.get("qty")
+    # =========================
+    # ⭐ 改數量（全部 or 單一）
+    # =========================
+                if u.get("qty") is not None:
+                    sheet.update_cell(row_no, 6, u["qty"])
 
-                if qty is not None:
-                    sheet.update_cell(row_no, 6, qty)
-                # 單位
+    # =========================
+    # 單位
+    # =========================
                 if u.get("unit"):
                     sheet.update_cell(row_no, 7, u["unit"])
 
-                # 單價
+    # =========================
+    # 單價
+    # =========================
                 if u.get("price") is not None:
                     sheet.update_cell(row_no, 8, u["price"])
 
-                # 配送
+    # =========================
+    # 配送
+    # =========================
                 if u.get("delivery"):
                     sheet.update_cell(row_no, 9, u["delivery"])
 
-                # 備註
+    # =========================
+    # 備註
+    # =========================
                 if u.get("note"):
                     sheet.update_cell(row_no, 10, u["note"])
 
