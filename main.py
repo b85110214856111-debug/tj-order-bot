@@ -1128,7 +1128,7 @@ def edit_order(text):
         if len(head) < 2:
             return "❌ 格式錯誤（日期/客戶）"
 
-        date = head[0]
+        dates = set(re.findall(r"\d{1,2}/\d{1,2}", " ".join(head)))
         customer = head[1]
 
         # ========= 每一行商品 =========
@@ -1238,13 +1238,13 @@ def edit_order(text):
                 if len(r) < 5:
                     continue
 
-                if r[2] != date:
+                if r[2] not in dates:
                     continue
 
                 if r[3] != customer:
                     continue
 
-                if old_product and r[4] != old_product:
+                if old_product and r[4] not in old_product:
                     continue
 
                 status = r[11] if len(r) > 11 else ""
