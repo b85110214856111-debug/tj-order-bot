@@ -1138,7 +1138,10 @@ def edit_order(text):
             if not parts:
                 continue
 
-            old_product = parts[0]
+            old_product = parts[0].strip()
+
+            if old_product in ["不指定"]:
+                old_product = ""
             # 第一個不是欄位名稱才當商品
             if parts[0] in ["日期", "數量", "單價", "配送", "備註"] or parts[0].startswith("*"):
                 old_product = ""
