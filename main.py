@@ -1138,7 +1138,10 @@ def edit_order(text):
             if not parts:
                 continue
 
-            old_product = parts[0]
+            old_product = ""
+
+            if parts and not parts[0].startswith("@"):
+                old_product = parts[0]
 
             if old_product in ["日期", "數量", "單價", "配送", "備註"] or old_product.startswith("*"):
                 old_product = ""
@@ -1199,7 +1202,7 @@ def edit_order(text):
 
                 match_date = (r[2] == date)
                 match_customer = (r[3] == customer)
-                match_product = (old_product == "" or r[4] == old_product)
+                match_product = (old_product == "" or r[4].strip() == old_product.strip())
 
                 if not (match_date and match_customer and match_product):
                     continue
