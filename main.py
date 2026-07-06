@@ -1452,8 +1452,14 @@ def parse_order_line(line):
     note = re.sub(r"@\d+(?:\.\d+)?", "", note)
     for d in DELIVERY_LIST:
         note = note.replace(d, "")
-    for p in parts[:4]:
-        note = note.replace(p, "")
+    # 移除日期
+    for d in dates:
+        note = note.replace(d, "", 1)
+
+    # 移除客戶、商品、數量
+    note = note.replace(customer, "", 1)
+    note = note.replace(product, "", 1)
+    note = note.replace(parts[i + 1], "", 1)
     note = note.strip()
 
     orders = []
