@@ -1191,7 +1191,7 @@ def edit_order(text):
                 "unit": unit,
                 "price": price,
                 "delivery": delivery,
-                "note": note
+                "note": note,
                 "new_date": new_date
             })
 
