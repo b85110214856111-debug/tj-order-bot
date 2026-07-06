@@ -501,18 +501,10 @@ def create_schedule_order(text):
 
         parts = order_text.split()
 
-        customer = parts[0]
+        customer = parts[0].strip() if parts else ""
 
         rows = customer_sheet.get_all_values()
-
-        customer_rows = []
-
-        for r in rows[1:]:
-            if r[0] == customer:
-                customer_rows.append(r)
-
-        if not customer_rows:
-            return "❌ 客戶未設定"
+        customer_rows = rows[1:]
 
 
         # 使用者有輸入商品
@@ -726,10 +718,14 @@ def create_schedule_order(text):
 
         if not product:
 
-            customer_rows = [
-                r for r in rows[1:]
-                if r[0] == customer
-            ]
+            # ⭐ 沒有客戶 → 全部客戶都排
+            if not customer:
+                customer_rows = rows[1:]
+            else:
+                customer_rows = [
+                    r for r in rows[1:]
+                    if r[0] == customer
+                ]
 
             for r in customer_rows:
 
@@ -822,7 +818,7 @@ def create_schedule_order(text):
 
     parts = order_text.split()
 
-    customer = parts[0]
+    customer = parts[0].strip() if parts else ""
     product = None
     qty = None
     unit = None
@@ -930,10 +926,6 @@ def create_schedule_order(text):
         if r[0] == customer:
             customer_data = r
             break
-
-
-    if not customer_data:
-        return "❌ 客戶未設定"
 
 
     #商品輸入優先
@@ -1106,6 +1098,7 @@ def edit_order(text):
 
     rows = sheet.get_all_values()
     text = text.strip()
+    text = normalize_symbols(text) 
 
     blocks = [
         b.strip()
@@ -1181,37 +1174,63 @@ def edit_order(text):
                     i += 2
                     continue
 
-                # ===== 數量 =====
-                if token == "數量":
-                    if i + 1 < len(remain):
-                        qty = remain[i + 1]
-                        m = re.match(r"(\d+(?:\.\d+)?)(.*)", qty)
-                        if m:
-                            updates["數量"] = m.group(1)
-                            updates["單位"] = parse_unit(qty)
-                    i += 2
+                # ===== × 數量 =====
+                if token.startswith("×"):
+                    value = token[1:]
+                    if not value and i + 1 < len(remain):
+                        value = remain[i + 1]
+                        i += 1
+
+                    m = re.match(r"(\d+(?:\.\d+)?)", value)
+                    if m:
+                        updates["數量"] = m.group(1)
+
+                    i += 1
                     continue
 
-                # ===== 配送 =====
-                if token == "配送":
-                    if i + 1 < len(remain):
-                        updates["配送"] = remain[i + 1]
-                    i += 2
+                # ===== + 配送 =====
+                if token.startswith("+"):
+                    value = token[1:]
+                    if not value and i + 1 < len(remain):
+                        value = remain[i + 1]
+                        i += 1
+
+                    updates["配送"] = value
+                    i += 1
                     continue
 
-                # ===== 日期 =====
-                if token == "日期":
-                    if i + 1 < len(remain):
-                        updates["日期"] = remain[i + 1]
-                    i += 2
+                # ===== # 日期 =====
+                if token.startswith("#"):
+                    value = token[1:]
+                    if not value and i + 1 < len(remain):
+                        value = remain[i + 1]
+                        i += 1
+
+                    updates["日期"] = value
+                    i += 1
                     continue
 
-                # ===== 備註 =====
-                if token == "備註":
-                    updates["備註"] = " ".join(remain[i + 1:])
-                    break
+                # ===== & 單位 =====
+                if token.startswith("&"):
+                    value = token[1:]
+                    if not value and i + 1 < len(remain):
+                        value = remain[i + 1]
+                        i += 1
 
-                i += 1
+                    updates["單位"] = value
+                    i += 1
+                    continue
+
+                # ===== ! 備註 =====
+                if token.startswith("!"):
+                    value = token[1:]
+                    if not value:
+                        value = " ".join(remain[i + 1:])
+                        i = len(remain)
+
+                    updates["備註"] = value
+                    i += 1
+                    continue
 
             # ========= 套用到 sheet =========
             for row_no, r in enumerate(rows[1:], start=2):
@@ -1259,6 +1278,18 @@ def edit_order(text):
         return "❌ 找不到符合訂單"
 
     return f"✅ 已改 {updated_total} 筆"
+
+def normalize_symbols(text: str):
+    table = str.maketrans({
+        "×": "×",
+        "×": "×",
+        "＋": "+",
+        "＋": "+",
+        "！": "!",
+        "＃": "#",
+        "＆": "&"
+    })
+    return text.translate(table)
 
 def parse_unit(text):
 
@@ -1994,6 +2025,112 @@ def restore_last_delete():
             restored += 1
 
     return f"✅ 已復原最後一次刪除，共 {restored} 筆"
+
+def smart_parse(text: str):
+    text = text.strip()
+
+    # 統一符號
+    text = (
+        text.replace("／", "/")
+            .replace("－", "-")
+            .replace("～", "~")
+            .replace("　", " ")
+            .replace("(", "（")
+            .replace(")", "）")
+    )
+
+    result = {
+        "customer": "",
+        "dates": [],
+        "product": "",
+        "qty": 0,
+        "unit": "件",
+        "price": 0,
+        "delivery": "",
+        "note": text
+    }
+
+    tokens = text.split()
+
+    # =====================
+    # 1. 日期（全部抓）
+    # =====================
+    result["dates"] = re.findall(r"\d{1,2}/\d{1,2}", text)
+
+    # =====================
+    # 2. 單價 @80
+    # =====================
+    m = re.search(r"@(\d+(?:\.\d+)?)", text)
+    if m:
+        result["price"] = float(m.group(1))
+
+    # =====================
+    # 3. 數量 + 單位（抓第一個）
+    # =====================
+    for t in tokens:
+        m = re.match(r"(\d+(?:\.\d+)?)([^\d\s]+)?", t)
+        if m:
+            result["qty"] = float(m.group(1))
+            if m.group(2):
+                result["unit"] = parse_unit(m.group(2))
+            break
+
+    # =====================
+    # 4. 配送
+    # =====================
+    result["delivery"] = detect_delivery(text)
+
+    # =====================
+    # 5. 客戶（用排除法）
+    # =====================
+    for t in tokens:
+        if (
+            re.match(r"\d{1,2}/\d{1,2}", t)
+            or t.startswith("@")
+            or t in DELIVERY_LIST
+            or re.match(r"\d", t)
+        ):
+            continue
+
+        # 第一個合理人名當客戶
+        if not result["customer"]:
+            result["customer"] = t
+            continue
+
+    # =====================
+    # 6. 商品（剩下的）
+    # =====================
+    ignore = set(result["dates"] + [result["customer"]])
+
+    product_tokens = []
+    for t in tokens:
+        if t in ignore:
+            continue
+        if t.startswith("@"):
+            continue
+        if re.match(r"\d+(?:\.\d+)?", t):
+            continue
+        if t in DELIVERY_LIST:
+            continue
+        product_tokens.append(t)
+
+    result["product"] = " ".join(product_tokens).strip()
+
+    # =====================
+    # 7. 備註（扣掉已解析內容）
+    # =====================
+    note = text
+    note = note.replace(result["customer"], "")
+    note = note.replace(result["product"], "")
+    for d in DELIVERY_LIST:
+        note = note.replace(d, "")
+    note = re.sub(r"@\d+(?:\.\d+)?", "", note)
+    note = re.sub(r"\d+(?:\.\d+)?[^\s]*", "", note)
+    note = note.strip()
+
+    result["note"] = note
+
+    return result
 
 @app.get("/files")
 def files():
