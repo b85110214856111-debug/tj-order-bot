@@ -1158,7 +1158,6 @@ def edit_order(text):
             i = 0
             while i < len(remain):
 
-
                 token = remain[i]
 
                 # ===== @數字 = 單價 =====
@@ -1251,8 +1250,11 @@ def edit_order(text):
                 if r[3] != customer:
                     continue
 
-                if old_product and r[4] != old_product:
-                    continue
+                # 如果有指定商品 → 只改該商品
+                # 如果沒指定商品 → 全部都改
+                if old_product != "" and old_product is not None:
+                    if r[4] != old_product:
+                        continue
 
                 status = r[11] if len(r) > 11 else ""
                 if status == "已刪除":
