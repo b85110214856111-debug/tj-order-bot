@@ -1294,7 +1294,7 @@ def parse_unit(text):
         if u in text:
             return u
 
-    return "件"
+    return ""
 
 def detect_delivery(text):
     for d in DELIVERY_LIST:
@@ -1905,7 +1905,8 @@ def parse_customer_products(text):
             "customer": customer,
             "product": product,
             "qty": qty,
-            "unit": unit if unit else "件",
+            #"unit": unit if unit else "件",
+            "unit": unit,
             "price": price,
             "delivery": delivery,
             "note": note
