@@ -1691,6 +1691,115 @@ def parse_multi_customer_order(text):
 
     return orders
 
+def parse_same_product_orders(text):
+
+    lines = [x.strip() for x in text.splitlines() if x.strip()]
+
+    if len(lines) < 2:
+        return []
+
+    # 第一行：客戶 商品
+    head = lines[0].split()
+
+    if len(head) < 2:
+        return []
+
+    customer = head[0]
+    product = " ".join(head[1:])
+
+    orders = []
+
+    for line in lines[1:]:
+
+        parts = line.split()
+
+        if len(parts) < 2:
+            continue
+
+        date = parts[0]
+
+        if not re.match(r"\d{1,2}/\d{1,2}$", date):
+            continue
+
+        qty = 0
+        unit = "件"
+        price = 0
+        delivery = ""
+        note = ""
+
+        # 第二欄：數量+單位
+        m = re.match(r"(\d+(?:\.\d+)?)(.*)", parts[1])
+
+        if not m:
+            continue
+
+        qty = float(m.group(1))
+
+        if m.group(2):
+            unit = parse_unit(m.group(2))
+
+        remain = []
+
+        for p in parts[2:]:
+
+            # 單價
+            if p.startswith("@"):
+                try:
+                    price = float(p[1:])
+                except:
+                    pass
+                continue
+
+            # 配送
+            if p in DELIVERY_LIST:
+                delivery = p
+                continue
+
+            remain.append(p)
+
+        note = " ".join(remain).strip()
+
+        # 如果沒輸入單價，自動抓 Customers 預設
+        if price == 0:
+
+            rows = customer_sheet.get_all_values()
+
+            for r in rows[1:]:
+
+                if len(r) < 4:
+                    continue
+
+                if r[0] == customer and r[1] == product:
+
+                    try:
+                        price = float(r[3])
+                    except:
+                        price = 0
+
+                    break
+
+        orders.append({
+
+            "date": date,
+
+            "customer": customer,
+
+            "product": product,
+
+            "qty": qty,
+
+            "unit": unit,
+
+            "price": price,
+
+            "delivery": delivery,
+
+            "note": note
+
+        })
+
+    return orders
+
 def query_order(text):
     keyword = text.replace("查詢", "").strip()
     result = []
