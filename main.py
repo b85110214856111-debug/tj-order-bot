@@ -2333,8 +2333,16 @@ async def callback(request: Request):
             continue
 
         # 改單 / 排程類：不要拆 block
-        if text.startswith("改單") or text.startswith("刪單") or text.startswith("復原"):
+        if text.startswith(("改單", "刪單", "復原")):
             commands = [text]
+
+        elif (
+            len(text.splitlines()) >= 3
+            and not text.splitlines()[0].startswith("查詢")
+        ):
+    # 客戶多商品格式，不拆空白行
+            commands = [text]
+
         else:
             commands = [
                 x.strip()
@@ -2465,13 +2473,18 @@ async def callback(request: Request):
                     first = lines[0].split()
 
     # 新格式：客戶 商品
+                    # 新格式
                     if (
-                        len(first) >= 2
-                        and not re.match(r"\d{1,2}/\d{1,2}$", first[0])
-                        and not is_header_line(lines[0])
+                        not is_header_line(lines[0])
+                        and not re.match(r"\d{1,2}/\d{1,2}$", lines[0])
                     ):
 
-                        orders = parse_same_product_orders(cmd)
+    # 先試客戶獨立格式
+                        orders = parse_customer_products(cmd)
+
+    # 不符合再試原本格式
+                        if not orders:
+                            orders = parse_same_product_orders(cmd)
 
                         if orders:
                             count = save_orders_batch(
