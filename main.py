@@ -1801,106 +1801,98 @@ def parse_same_product_orders(text):
     return orders
 
 def parse_customer_products(text):
+    lines = [x.strip() for x in text.splitlines() if x.strip()]
 
-    lines = [x.strip() for x in text.splitlines()]
+    rows = customer_sheet.get_all_values()
 
     orders = []
 
     customer = ""
     product = ""
 
-    rows = customer_sheet.get_all_values()
+    for i, line in enumerate(lines):
 
-    for line in lines:
+        # ===== 日期 =====
+        if re.match(r"\d{1,2}/\d{1,2}", line):
 
-        if not line:
+            if not customer or not product:
+                continue
+
+            parts = line.split()
+
+            date = parts[0]
+
+            qty = 0
+            unit = ""
+            price = 0
+            delivery = ""
+            note = ""
+
+            # 數量
+            if len(parts) >= 2:
+                m = re.match(r"(\d+(?:\.\d+)?)(.*)", parts[1])
+                if m:
+                    qty = float(m.group(1))
+                    unit = parse_unit(m.group(2))
+
+            # 預設價格
+            for r in rows[1:]:
+                if r[0] == customer and r[1] == product:
+                    try:
+                        price = float(r[3])
+                    except:
+                        pass
+                    break
+
+            remain = []
+
+            for p in parts[2:]:
+
+                if p.startswith("@"):
+                    try:
+                        price = float(p[1:])
+                    except:
+                        pass
+                    continue
+
+                if p in DELIVERY_LIST:
+                    delivery = p
+                    continue
+
+                remain.append(p)
+
+            note = " ".join(remain)
+
+            orders.append({
+                "date": date,
+                "customer": customer,
+                "product": product,
+                "qty": qty,
+                "unit": unit,
+                "price": price,
+                "delivery": delivery,
+                "note": note
+            })
+
             continue
 
-        # 第一個客戶
-        if customer == "":
+        # ===== 非日期 =====
+
+        next_is_date = False
+
+        if i + 1 < len(lines):
+            next_is_date = bool(
+                re.match(r"\d{1,2}/\d{1,2}", lines[i + 1])
+            )
+
+        if next_is_date:
+            # 商品
+            product = line
+        else:
+            # 客戶
             customer = line
             product = ""
-            continue
-
-        # 商品
-        if not re.match(r"\d{1,2}/\d{1,2}", line):
-
-            # 如果已經有商品，再遇到非日期＝新客戶
-            if product:
-                customer = line
-                product = ""
-            else:
-                product = line
-
-            continue
-
-        # ========= 日期 =========
-
-        parts = line.split()
-
-        date = parts[0]
-
-        qty = 0
-        unit = ""
-        price = 0
-        delivery = ""
-        note = ""
-
-        if len(parts) >= 2:
-
-            m = re.match(r"(\d+(?:\.\d+)?)(.*)", parts[1])
-
-            if m:
-
-                qty = float(m.group(1))
-
-                unit = parse_unit(m.group(2))
-
-        # Customers 補單價
-        for r in rows[1:]:
-
-            if r[0] == customer and r[1] == product:
-
-                try:
-                    price = float(r[3])
-                except:
-                    price = 0
-
-                break
-
-        remain = []
-
-        for p in parts[2:]:
-
-            if p.startswith("@"):
-
-                try:
-                    price = float(p[1:])
-                except:
-                    pass
-
-                continue
-
-            if p in DELIVERY_LIST:
-
-                delivery = p
-                continue
-
-            remain.append(p)
-
-        note = " ".join(remain)
-
-        orders.append({
-            "date": date,
-            "customer": customer,
-            "product": product,
-            "qty": qty,
-            "unit": unit,
-            "price": price,
-            "delivery": delivery,
-            "note": note
-        })
-
+    
     return orders
 
 def query_order(text):
