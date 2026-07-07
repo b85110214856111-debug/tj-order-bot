@@ -1806,63 +1806,100 @@ def parse_customer_products(text):
 
     orders = []
 
-    customer = None
-    product = None
+    customer = ""
+    product = ""
 
-    i = 0
+    rows = customer_sheet.get_all_values()
 
-    while i < len(lines):
-
-        line = lines[i]
+    for line in lines:
 
         if not line:
-            i += 1
             continue
 
-        # 日期行
-        if re.match(r"\d{1,2}/\d{1,2}", line):
-
-            if customer and product:
-
-                data = parse_order_line(
-                    f"{line} {customer} {product}"
-                )
-
-                if isinstance(data, list):
-                    orders.extend(data)
-                elif data:
-                    orders.append(data)
-
-            i += 1
-            continue
-
-        # 第一位一定是客戶
-        if customer is None:
+        # 第一個客戶
+        if customer == "":
             customer = line
-            product = None
-            i += 1
+            product = ""
             continue
 
-        # 下一行是日期 -> 目前這行一定是商品
-        if (
-            i + 1 < len(lines)
-            and re.match(r"\d{1,2}/\d{1,2}", lines[i + 1])
-        ):
-            product = line
-            i += 1
+        # 商品
+        if not re.match(r"\d{1,2}/\d{1,2}", line):
+
+            # 如果已經有商品，再遇到非日期＝新客戶
+            if product:
+                customer = line
+                product = ""
+            else:
+                product = line
+
             continue
 
-        # 下一行不是日期
-        if product is not None:
-            # 已經有商品，又遇到非日期
-            # 代表開始新的客戶
-            customer = line
-            product = None
-        else:
-            # 尚未有商品
-            product = line
+        # ========= 日期 =========
 
-        i += 1
+        parts = line.split()
+
+        date = parts[0]
+
+        qty = 0
+        unit = ""
+        price = 0
+        delivery = ""
+        note = ""
+
+        if len(parts) >= 2:
+
+            m = re.match(r"(\d+(?:\.\d+)?)(.*)", parts[1])
+
+            if m:
+
+                qty = float(m.group(1))
+
+                unit = parse_unit(m.group(2))
+
+        # Customers 補單價
+        for r in rows[1:]:
+
+            if r[0] == customer and r[1] == product:
+
+                try:
+                    price = float(r[3])
+                except:
+                    price = 0
+
+                break
+
+        remain = []
+
+        for p in parts[2:]:
+
+            if p.startswith("@"):
+
+                try:
+                    price = float(p[1:])
+                except:
+                    pass
+
+                continue
+
+            if p in DELIVERY_LIST:
+
+                delivery = p
+                continue
+
+            remain.append(p)
+
+        note = " ".join(remain)
+
+        orders.append({
+            "date": date,
+            "customer": customer,
+            "product": product,
+            "qty": qty,
+            "unit": unit,
+            "price": price,
+            "delivery": delivery,
+            "note": note
+        })
 
     return orders
 
