@@ -2351,15 +2351,25 @@ async def callback(request: Request):
 
                 # ===== 多行訂單 =====
                 # ===== 多行訂單 =====
-                if len(lines) > 1 and is_header_line(lines[0]):
+                if len(lines) > 1:
 
-                    orders = parse_multi_customer_order(cmd)
+                    first = lines[0].split()
 
-                    if orders:
-                        count = save_orders_batch(
-                            orders,
-                            user_name
-                        )
+                    # 新格式：客戶 商品
+                    if (
+                        len(first) == 2
+                        and not re.match(r"\d{1,2}/\d{1,2}", first[0])
+                    ):
+
+                        orders = parse_same_product_orders(cmd)
+
+                    elif is_header_line(lines[0]):
+
+                        orders = parse_multi_customer_order(cmd)
+
+                    else:
+
+                        orders = []
 
                 # ===== 每行都是完整訂單 =====
                 else:
