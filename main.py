@@ -2459,46 +2459,78 @@ async def callback(request: Request):
                 ]
 
                 # ===== 多行訂單 =====
-                # ===== 多行訂單 =====
+
                 if len(lines) > 1:
 
                     first = lines[0].split()
 
-                    # 新格式：客戶 商品
+    # 新格式：客戶 商品
                     if (
-                        len(first) == 2
-                        and not re.match(r"\d{1,2}/\d{1,2}", first[0])
+                        len(first) >= 2
+                        and not re.match(r"\d{1,2}/\d{1,2}$", first[0])
+                        and not is_header_line(lines[0])
                     ):
 
                         orders = parse_same_product_orders(cmd)
 
+                        if orders:
+                            count = save_orders_batch(
+                                orders,
+                                user_name
+                            )
+
+    # 舊格式：日期 客戶
                     elif is_header_line(lines[0]):
 
                         orders = parse_multi_customer_order(cmd)
 
+                        if orders:
+                            count = save_orders_batch(
+                                orders,
+                                user_name
+                            )
+
+    # 每行都是完整訂單
                     else:
 
                         orders = []
 
-                # ===== 每行都是完整訂單 =====
+                        for line in lines:
+
+                            data = parse_order_line(line)
+
+                            if isinstance(data, list):
+                                orders.extend(data)
+                            elif data:
+                                orders.append(data)
+
+                        if orders:
+                            count = save_orders_batch(
+                                orders,
+                                user_name
+                            )
+
+# ===== 單行 =====
                 else:
 
                     orders = []
 
-                    for line in lines:
+                    data = parse_order_line(lines[0])
 
-                        data = parse_order_line(line)
-
-                        if isinstance(data, list):
-                            orders.extend(data)
-                        elif data:
-                            orders.append(data)
+                    if isinstance(data, list):
+                        orders.extend(data)
+                    elif data:
+                        orders.append(data)
 
                     if orders:
                         count = save_orders_batch(
                             orders,
                             user_name
-                        )                  
+                        )
+                
+
+                # ===== 每行都是完整訂單 =====
+                                
 
                 results.append(
                     f"✅ 已建 {count} 筆"
