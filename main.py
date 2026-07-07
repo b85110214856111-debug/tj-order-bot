@@ -478,6 +478,7 @@ from datetime import timedelta
 import calendar
 
 def create_schedule_order(text):
+    text = text.replace("周", "週")
     added_dates = set()
     orders = []
     target_dates = []
@@ -2192,7 +2193,7 @@ async def callback(request: Request):
 
         user_id = event["source"]["userId"]
         user_name = get_user_name(user_id)
-        
+        text = text.replace("周", "週")
         if (
             "\n" in text
             and "下週" in text
@@ -2222,6 +2223,7 @@ async def callback(request: Request):
 
         for cmd in commands:
 
+            cmd = cmd.replace("周", "週")
             if cmd.startswith("查詢"):
 
                 results.append(
@@ -2316,7 +2318,7 @@ async def callback(request: Request):
                 results.append(
                     create_schedule_order(cmd)
                 )
-
+            
             elif "每週" in cmd and "到貨" in cmd:
 
                 results.append(
