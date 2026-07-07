@@ -1175,14 +1175,28 @@ def edit_order(text):
                 elif token.startswith("*"):
                     updates["商品"] = token[1:]
 
-                # ===== 數量 =====
+                # ===== 數量（支援 ×5、×5包、× 5包）=====
                 elif token.startswith("×"):
-                    v = token[1:]
+
+                    v = token[1:].strip()
+
+                    # 支援 × 5包
                     if not v and i + 1 < len(parts):
                         i += 1
-                        v = parts[i]
-                    if re.match(r"\d+(\.\d+)?", v):
-                        updates["數量"] = v
+                        v = parts[i].strip()
+
+                    m = re.match(r"(\d+(?:\.\d+)?)(.*)", v)
+
+                    if m:
+
+                        # 數量
+                        updates["數量"] = m.group(1)
+
+                        # 單位
+                        remain = m.group(2).strip()
+
+                        if remain:
+                            updates["單位"] = parse_unit(remain)
 
                 # ===== 配送 =====
                 elif token.startswith("+"):
