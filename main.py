@@ -53,12 +53,25 @@ def parse_date(text):
         ).date()
 
     # mm/dd
+    # mm/dd（自動判斷是否跨年）
     m = re.fullmatch(r"(\d{1,2})/(\d{1,2})", text)
     if m:
+
+        month = int(m.group(1))
+        day = int(m.group(2))
+
+        today = now_tw().date()
+
+        year = today.year
+
+        # 若今天已接近年底，輸入較小月份，自動視為明年
+        if today.month >= 11 and month <= 3:
+            year += 1
+
         return datetime(
-            current_year(),
-            int(m.group(1)),
-            int(m.group(2))
+            year,
+            month,
+            day
         ).date()
 
     return None
@@ -411,17 +424,19 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
         # Photos（🔥直接串流，不落地）
         photos = photo_sheet.get_all_values()
 
+        if start_date and end_date:
+            start = parse_date(start_date)
+            end = parse_date(end_date)
+        else:
+            start = None
+            end = None
+
         index = 1
 
         for p in photos[1:]:
 
-            if start_date and end_date:
-                start = parse_date(start_date)
-                end = parse_date(end_date)
+            if start and end:
                 photo_date = parse_date(p[0])
-
-                start = parse_date(start_date)
-                end = parse_date(end_date)
 
                 if not photo_date:
                     continue
@@ -1034,7 +1049,11 @@ def create_schedule_order(text):
         today.month
     )[1]
 
-    end_date = today.replace(day=last_day)
+    end_date = datetime(
+        today.year,
+        today.month,
+        last_day
+    ).date()
 
     orders = []
 
@@ -1272,7 +1291,12 @@ def edit_order(text):
         # =========================
         for row_no, r in enumerate(rows[1:], start=2):
 
-            sheet_date = str(r[2]).strip()
+            sheet_date = ""
+
+            d = parse_date(r[2])
+
+            if d:
+                sheet_date = format_date(d)
             sheet_customer = str(r[3]).strip()
             sheet_product = str(r[4]).strip()
 
@@ -1659,7 +1683,7 @@ def parse_multi_customer_order(text):
                     break
 
             current_customer = " ".join(tokens[i:])
-
+            continue
         # 只有第一行才解析日期/客戶
         if tokens:
 
@@ -2006,7 +2030,14 @@ def query_order(text):
         if status == "已刪除":
             continue
 
-        if keyword in " ".join(r):
+        row = r.copy()
+
+        d = parse_date(r[2])
+
+        if d:
+            row[2] = format_date(d)
+
+        if keyword in " ".join(row):
             result.append(r)
 
     if not result:
@@ -2087,7 +2118,9 @@ def delete_order(text, user_id):
             if status == "已刪除":
                continue
 
-            if r[2] in dates:
+            sheet_date = parse_date(r[2])
+
+            if sheet_date and format_date(sheet_date) in dates:
 
                 sheet.update(
                     f"L{i}:O{i}",
@@ -2116,7 +2149,12 @@ def delete_order(text, user_id):
         if status == "已刪除":
             continue
 
-        if r[2] != target_date:
+        sheet_date = parse_date(r[2])
+
+        if not sheet_date:
+            continue
+
+        if format_date(sheet_date) != target_date:
             continue
 
         if customer and r[3] != customer:
@@ -2217,7 +2255,9 @@ def restore_order(text):
             if status != "已刪除":
                 continue
 
-            if r[2] in dates:
+            sheet_date = parse_date(r[2])
+
+            if sheet_date and format_date(sheet_date) in dates:
 
                 sheet.update(
                     f"L{i}:O{i}",
@@ -2252,7 +2292,12 @@ def restore_order(text):
         if status != "已刪除":
             continue
 
-        if r[2].strip() != target_date:
+        sheet_date = parse_date(r[2])
+
+        if not sheet_date:
+            continue
+
+        if format_date(sheet_date) != target_date:
             continue
 
         if customer and r[3].strip() != customer:
