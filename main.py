@@ -1520,15 +1520,17 @@ def parse_order_line(line):
     i = 0
 
     # 日期在前
-    if re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}$", parts[0]):
+    # 日期在前（支援多日期）
+    if parse_date(parts[0]):
 
-        while i < len(parts) and re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}$", parts[i]):
-            d=parse_date(parts[i])
+        while i < len(parts):
 
-            if d:
+            d = parse_date(parts[i])
 
-                dates.append(format_date(d))
+            if not d:
+                break
 
+            dates.append(format_date(d))
             i += 1
 
         if i >= len(parts):
@@ -1538,18 +1540,20 @@ def parse_order_line(line):
         i += 1
 
     # 客戶在前
+    # 客戶在前（支援多日期）
     else:
 
         customer = parts[0]
         i = 1
 
-        while i < len(parts) and re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}$", parts[i]):
-            d=parse_date(parts[i])
+        while i < len(parts):
 
-            if d:
+            d = parse_date(parts[i])
 
-                dates.append(format_date(d))
+            if not d:
+                break
 
+            dates.append(format_date(d))
             i += 1
 
         if not dates or i >= len(parts):
@@ -1687,8 +1691,14 @@ def parse_multi_customer_order(text):
                 current_dates = []
 
                 for t in tokens[1:]:
-                    if re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}$", t):
-                        current_dates.append(t)
+
+                    if not re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}$", t):
+                        break
+
+                    d = parse_date(t)
+
+                    if d:
+                        current_dates.append(format_date(d))
 
                 continue
 
