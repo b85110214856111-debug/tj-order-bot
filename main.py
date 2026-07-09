@@ -2657,6 +2657,7 @@ async def callback(request: Request):
 
     # 先試客戶獨立格式
                         orders = parse_customer_products(cmd)
+                        print("parse_customer_products =", orders)
 
     # 不符合再試原本格式
                         if not orders:
