@@ -2578,6 +2578,7 @@ async def callback(request: Request):
                     # 新格式
                     if (
                         not is_header_line(lines[0])
+                        and not re.match(r"\d{1,2}/\d{1,2}$", lines[0])
                     ):
 
     # 先試客戶獨立格式
