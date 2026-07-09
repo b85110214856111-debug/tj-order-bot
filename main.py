@@ -2444,6 +2444,12 @@ async def callback(request: Request):
             commands = [text]
 
         else:
+
+            lines = [
+                x.strip()
+                for x in text.splitlines()
+                if x.strip()
+            ]
             if (
                 len(lines) > 1
                 and not is_header_line(lines[0])
