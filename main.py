@@ -2685,7 +2685,23 @@ async def callback(request: Request):
     # 舊格式：日期 客戶
                     elif is_header_line(lines[0]):
 
-                        orders = parse_multi_customer_order(cmd)
+    # 如果第一行就是完整訂單
+                        if parse_order_line(lines[0]):
+
+                            orders = []
+
+                            for line in lines:
+
+                                data = parse_order_line(line)
+
+                                if isinstance(data, list):
+                                    orders.extend(data)
+                                elif data:
+                                    orders.append(data)
+
+                        else:
+
+                            orders = parse_multi_customer_order(cmd)
 
                         if orders:
                             count = save_orders_batch(
