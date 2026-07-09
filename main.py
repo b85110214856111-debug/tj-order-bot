@@ -1944,23 +1944,16 @@ def parse_customer_products(text):
 
         # ===== 非日期 =====
 
-        next_is_date = False
+        # 第一行一定是客戶
+        if i == 0:
+            customer = line
+            product = ""
+            continue
 
-        if i + 1 < len(lines):
-            next_is_date = bool(
-                re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}", lines[i + 1])
-            )
+# 只要不是日期，就是商品
+        product = line
 
-        if next_is_date:
-            # 商品
-            product = line
-        else:
-        # 已經有客戶，代表是新的商品
-            if customer:
-                product = line
-            else:
-                customer = line
-                product = ""
+        
     
     return orders
 
