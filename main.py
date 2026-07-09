@@ -36,6 +36,48 @@ TW = timezone(timedelta(hours=8))
 def now_tw():
     return datetime.now(TW)
 
+def normalize_date(date_str: str):
+    """
+    支援：
+    7/5
+    07/05
+    2027/7/5
+    2027/07/05
+    """
+
+    date_str = date_str.strip()
+
+    parts = date_str.split("/")
+
+    if len(parts) == 2:
+        year = now_tw().year
+        month = int(parts[0])
+        day = int(parts[1])
+
+    elif len(parts) == 3:
+        year = int(parts[0])
+        month = int(parts[1])
+        day = int(parts[2])
+
+    else:
+        raise ValueError("日期格式錯誤")
+
+    return f"{year}/{month:02d}/{day:02d}"
+
+def parse_date(date_str: str):
+    date_str = normalize_date(date_str)
+    return datetime.strptime(
+        date_str,
+        "%Y/%m/%d"
+    ).date()
+
+
+def format_date(d):
+    """
+    date -> YYYY/MM/DD
+    """
+    return d.strftime("%Y/%m/%d")
+
 import cloudinary
 import cloudinary.uploader
 import tempfile
@@ -276,14 +318,28 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
         if start_date and end_date:
 
             try:
-                month, day = map(int, r[2].split("/"))
-                order_num = month * 100 + day
+                dt = parse_date(r[2])
 
-                sm, sd = map(int, start_date.split("/"))
-                em, ed = map(int, end_date.split("/"))
+                order_num = (
+                    dt.year * 10000
+                    + dt.month * 100
+                    + dt.day
+                )
 
-                start_num = sm * 100 + sd
-                end_num = em * 100 + ed
+                start_dt = parse_date(start_date)
+                end_dt = parse_date(end_date)
+
+                start_num = (
+                    start_dt.year * 10000
+                    + start_dt.month * 100
+                    + start_dt.day
+                )
+
+                end_num = (
+                    end_dt.year * 10000
+                    + end_dt.month * 100
+                    + end_dt.day
+                )
 
                 if order_num < start_num or order_num > end_num:
                     continue
@@ -376,15 +432,11 @@ def export_orders(keyword="全部", start_date=None, end_date=None):
         for p in photos[1:]:
 
             if start_date and end_date:
-                sm, sd = map(int, start_date.split("/"))
-                em, ed = map(int, end_date.split("/"))
-                pm, pd = map(int, p[0].split("/"))
+                start_dt = parse_date(start_date)
+                end_dt = parse_date(end_date)
+                photo_dt = parse_date(p[0])
 
-                s = sm * 100 + sd
-                e = em * 100 + ed
-                d = pm * 100 + pd
-
-                if d < s or d > e:
+                if photo_dt < start_dt or photo_dt > end_dt:
                     continue
 
             img_bytes = download_file_bytes(p[4])
@@ -659,7 +711,7 @@ def create_schedule_order(text):
 
                 if d.weekday() in target_days:
 
-                    date_str = f"{d.month}/{d.day}"
+                    date_str = d.strftime("%Y/%m/%d")
 
                     if date_str in added_dates:
                         continue
@@ -708,7 +760,7 @@ def create_schedule_order(text):
 
                 if current.weekday() in target_days:
 
-                    date_str = f"{current.month}/{current.day}"
+                    date_str = current.strftime("%Y/%m/%d")
 
                     if date_str not in added_dates:
 
@@ -1023,7 +1075,7 @@ def create_schedule_order(text):
                         default_price = 0
 
                     orders.append({
-                        "date": f"{current.month}/{current.day}",
+                        "date": current.strftime("%Y/%m/%d"),
                         "customer": customer,
                         "product": r[1],
                         "qty": default_qty,
@@ -1045,7 +1097,7 @@ def create_schedule_order(text):
             if current.weekday() in target_days:
 
                 orders.append({
-                    "date": f"{current.month}/{current.day}",
+                    "date": current.strftime("%Y/%m/%d"),
                     "customer": customer,
                     "product": product,
                     "qty": qty,
@@ -1132,7 +1184,7 @@ def edit_order(text):
         rest = []
 
         for t in head:
-            if re.match(r"\d{1,2}/\d{1,2}", t):
+            if re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}", t):
                 dates.append(t.strip())
             else:
                 rest.append(t)
@@ -1142,7 +1194,7 @@ def edit_order(text):
         product_filter = [
             x.strip()
             for x in rest[1:]
-            if x and not re.match(r"\d{1,2}/\d{1,2}", x)
+            if x and not re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}", x)
         ]
 
         has_product_filter = len(product_filter) > 0
@@ -1245,7 +1297,11 @@ def edit_order(text):
             # 寫入更新
             # =========================
             if "日期" in updates:
-                sheet.update_cell(row_no, 3, updates["日期"])
+                sheet.update_cell(
+                    row_no,
+                    3,
+                    normalize_date(updates["日期"])
+                )
 
             if "商品" in updates:
                 sheet.update_cell(row_no, 5, updates["商品"])
@@ -1434,11 +1490,11 @@ def is_header_line(line):
         return False
 
     # 第一個是日期
-    if re.match(r"\d{1,2}/\d{1,2}$", tokens[0]):
+    if re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}$", tokens[0]):
 
         # 找到第一個不是日期的位置
         i = 0
-        while i < len(tokens) and re.match(r"\d{1,2}/\d{1,2}$", tokens[i]):
+        while i < len(tokens) and re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}$", tokens[i]):
             i += 1
 
         # 只有日期+客戶
@@ -1447,11 +1503,11 @@ def is_header_line(line):
     # 第一個是客戶
     if (
         len(tokens) >= 2
-        and re.match(r"\d{1,2}/\d{1,2}$", tokens[1])
+        and re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}$", tokens[1])
     ):
 
         j = 1
-        while j < len(tokens) and re.match(r"\d{1,2}/\d{1,2}$", tokens[j]):
+        while j < len(tokens) and re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}$", tokens[j]):
             j += 1
 
         return j == len(tokens)
@@ -1468,10 +1524,12 @@ def parse_order_line(line):
     i = 0
 
     # 日期在前
-    if re.match(r"\d{1,2}/\d{1,2}$", parts[0]):
+    if re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}$", parts[0]):
 
-        while i < len(parts) and re.match(r"\d{1,2}/\d{1,2}$", parts[i]):
-            dates.append(parts[i])
+        while i < len(parts) and re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}$", parts[i]):
+            dates.append(
+                normalize_date(parts[i])
+            )
             i += 1
 
         if i >= len(parts):
@@ -1486,8 +1544,10 @@ def parse_order_line(line):
         customer = parts[0]
         i = 1
 
-        while i < len(parts) and re.match(r"\d{1,2}/\d{1,2}$", parts[i]):
-            dates.append(parts[i])
+        while i < len(parts) and re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}$", parts[i]):
+            dates.append(
+                normalize_date(parts[i])
+            )
             i += 1
 
         if not dates or i >= len(parts):
@@ -1538,7 +1598,7 @@ def parse_order_line(line):
 
     for d in dates:
         orders.append({
-            "date": d,
+            "date": normalize_date(d),
             "customer": customer,
             "product": product,
             "qty": qty,
@@ -1576,14 +1636,16 @@ def parse_multi_customer_order(text):
         
 
         # 日期在前
-        if tokens and re.match(r"\d{1,2}/\d{1,2}$", tokens[0]):
+        if tokens and re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}$", tokens[0]):
 
             i = 0
 
             while i < len(tokens):
 
-                if re.match(r"\d{1,2}/\d{1,2}$", tokens[i]):
-                    current_dates.append(tokens[i])
+                if re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}$", tokens[i]):
+                    current_dates.append(
+                        normalize_date(tokens[i])
+                    )
                     i += 1
                 else:
                     break
@@ -1594,13 +1656,15 @@ def parse_multi_customer_order(text):
         if tokens:
 
             # 日期在前
-            if re.match(r"\d{1,2}/\d{1,2}$", tokens[0]):
+            if re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}$", tokens[0]):
 
                 current_dates = []
 
                 i = 0
-                while i < len(tokens) and re.match(r"\d{1,2}/\d{1,2}$", tokens[i]):
-                    current_dates.append(tokens[i])
+                while i < len(tokens) and re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}$", tokens[i]):
+                    current_dates.append(
+                        normalize_date(tokens[i])
+                    )
                     i += 1
 
                 current_customer = " ".join(tokens[i:])
@@ -1610,15 +1674,17 @@ def parse_multi_customer_order(text):
             # 客戶在前（第二個開始有日期）
             elif (
                 len(tokens) > 1
-                and re.match(r"\d{1,2}/\d{1,2}$", tokens[1])
+                and re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}$", tokens[1])
             ):
 
                 current_customer = tokens[0]
                 current_dates = []
 
                 for t in tokens[1:]:
-                    if re.match(r"\d{1,2}/\d{1,2}$", t):
-                        current_dates.append(t)
+                    if re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}$", t):
+                        current_dates.append(
+                            normalize_date(t)
+                        )
 
                 continue
 
@@ -1679,7 +1745,7 @@ def parse_multi_customer_order(text):
         for d in current_dates:
 
             orders.append({
-                "date": d,
+                "date": normalize_date(d),
                 "customer": current_customer,
                 "product": product,
                 "qty": qty,
@@ -1718,7 +1784,7 @@ def parse_same_product_orders(text):
 
         date = parts[0]
 
-        if not re.match(r"\d{1,2}/\d{1,2}$", date):
+        if not re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}$", date):
             continue
 
         qty = 0
@@ -1780,7 +1846,7 @@ def parse_same_product_orders(text):
 
         orders.append({
 
-            "date": date,
+            "date": normalize_date(date),
 
             "customer": customer,
 
@@ -1813,7 +1879,7 @@ def parse_customer_products(text):
     for i, line in enumerate(lines):
 
         # ===== 日期 =====
-        if re.match(r"\d{1,2}/\d{1,2}", line):
+        if re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}", line):
 
             if not customer or not product:
                 continue
@@ -1864,7 +1930,7 @@ def parse_customer_products(text):
             note = " ".join(remain)
 
             orders.append({
-                "date": date,
+                "date": normalize_date(date),
                 "customer": customer,
                 "product": product,
                 "qty": qty,
@@ -1882,7 +1948,7 @@ def parse_customer_products(text):
 
         if i + 1 < len(lines):
             next_is_date = bool(
-                re.match(r"\d{1,2}/\d{1,2}", lines[i + 1])
+                re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}", lines[i + 1])
             )
 
         if next_is_date:
@@ -1897,6 +1963,9 @@ def parse_customer_products(text):
 
 def query_order(text):
     keyword = text.replace("查詢", "").strip()
+
+    if re.fullmatch(r"(?:\d{4}/)?\d{1,2}/\d{1,2}", keyword):
+        keyword = normalize_date(keyword)
     result = []
 
     for r in sheet.get_all_values()[1:]:
@@ -1956,9 +2025,9 @@ def delete_order(text, user_id):
                 deleted += 1
         return f"✅ 已刪 {deleted} 筆" if deleted else "❌ 找不到訂單"
 
-    dates = [x for x in parts[1:] if re.match(r"\d{1,2}/\d{1,2}", x)]
+    dates = [normalize_date(x) for x in parts[1:] if re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}", x)]
 
-    others = [x for x in parts[1:] if not re.match(r"\d{1,2}/\d{1,2}", x)]
+    others = [x for x in parts[1:] if not re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}", x)]
 
     customer = others[0] if len(others) >= 1 else ""
     product = others[1] if len(others) >= 2 else ""
@@ -2075,14 +2144,15 @@ def restore_order(text):
             else "❌ 找不到已刪除訂單"
         )
 
-    dates = [
-        x for x in parts[1:]
-        if re.match(r"\d{1,2}/\d{1,2}", x)
-    ]
+    dates = []
+
+    for x in parts[1:]:
+        if re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}$", x):
+            dates.append(normalize_date(x))
 
     others = [
         x for x in parts[1:]
-        if not re.match(r"\d{1,2}/\d{1,2}", x)
+        if not re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}", x)
     ]
 
     customer = others[0] if len(others) >= 1 else ""
@@ -2252,7 +2322,13 @@ def smart_parse(text: str):
     # =====================
     # 1. 日期（全部抓）
     # =====================
-    result["dates"] = re.findall(r"\d{1,2}/\d{1,2}", text)
+    result["dates"] = [
+        normalize_date(x)
+        for x in re.findall(
+            r"(?:\d{4}/)?\d{1,2}/\d{1,2}",
+            text
+        )
+    ]
 
     # =====================
     # 2. 單價 @80
@@ -2282,7 +2358,7 @@ def smart_parse(text: str):
     # =====================
     for t in tokens:
         if (
-            re.match(r"\d{1,2}/\d{1,2}", t)
+            re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}", t)
             or t.startswith("@")
             or t in DELIVERY_LIST
             or re.match(r"\d", t)
@@ -2470,7 +2546,7 @@ async def callback(request: Request):
                 end_date = None
 
                 m = re.match(
-                    r"(\d{1,2}/\d{1,2})\s*[~-]\s*(\d{1,2}/\d{1,2})(?:\s+(.*))?$",
+                    r"((?:\d{4}/)?\d{1,2}/\d{1,2})\s*[~-]\s*((?:\d{4}/)?\d{1,2}/\d{1,2})(?:\s+(.*))?$",
                     text
                 )
 
@@ -2576,7 +2652,7 @@ async def callback(request: Request):
                     # 新格式
                     if (
                         not is_header_line(lines[0])
-                        and not re.match(r"\d{1,2}/\d{1,2}$", lines[0])
+                        and not re.match(r"(?:\d{4}/)?\d{1,2}/\d{1,2}$", lines[0])
                     ):
 
     # 先試客戶獨立格式
