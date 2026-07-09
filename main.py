@@ -2432,10 +2432,15 @@ async def callback(request: Request):
             commands = [text]
 
         elif (
-            len(text.splitlines()) >= 3
-            and not text.splitlines()[0].startswith("查詢")
+            "下週" in text
+            and "之後每週" in text
         ):
-    # 客戶多商品格式，不拆空白行
+            commands = [text]
+
+        elif (
+            "每週" in text
+            and "到貨" in text
+        ):
             commands = [text]
 
         else:
