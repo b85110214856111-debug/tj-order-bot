@@ -1955,9 +1955,12 @@ def parse_customer_products(text):
             # 商品
             product = line
         else:
-            # 客戶
-            customer = line
-            product = ""
+        # 已經有客戶，代表是新的商品
+            if customer:
+                product = line
+            else:
+                customer = line
+                product = ""
     
     return orders
 
@@ -2657,7 +2660,6 @@ async def callback(request: Request):
 
     # 先試客戶獨立格式
                         orders = parse_customer_products(cmd)
-                        print("parse_customer_products =", orders)
 
     # 不符合再試原本格式
                         if not orders:
