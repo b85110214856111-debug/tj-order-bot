@@ -2443,6 +2443,8 @@ async def callback(request: Request):
         ):
             commands = [text]
 
+        if parse_customer_products(text):
+            commands = [text]      # 不切 block
         else:
             commands = [
                 x.strip()
