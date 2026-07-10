@@ -611,18 +611,18 @@ def create_schedule_order(text):
         delivery = ""
         note = ""
 
-        order_text = lines[0]
-
-        parts = order_text.split()
-
-        customer = parts[0].strip() if parts else ""
+        # 第一行：客戶
+        customer = lines[0].strip()
 
         rows = customer_sheet.get_all_values()
         customer_rows = rows[1:]
 
+        # 第三行：商品資料
+        order_text = lines[2]
 
-        # 使用者有輸入商品
-        product = parts[1] if len(parts) >= 2 else ""
+        parts = order_text.split()
+
+        product = parts[0] if len(parts) >= 1 else ""
 
 
         # 先保留輸入值
@@ -683,7 +683,7 @@ def create_schedule_order(text):
         }    
 
         # 數量
-        for p in parts[2:]:
+        for p in parts[1:]:
 
             m = re.match(r"(\d+(?:\.\d+)?)(.*)", p)
 
@@ -714,7 +714,7 @@ def create_schedule_order(text):
         # 備註
         note = order_text
 
-        note = note.replace(customer, "", 1)
+        # 第三行沒有客戶，所以不用移除 customer
         note = note.replace(product, "", 1)
 
         # 移除數量+單位（例如 5箱、10件）
