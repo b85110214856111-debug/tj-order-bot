@@ -2263,8 +2263,6 @@ def restore_order(text, rows):
     if len(parts) < 2:
         return "❌ 復原格式錯誤"
 
-    
-
     restored = 0
 
     # 復原單號
