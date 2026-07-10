@@ -717,7 +717,21 @@ def create_schedule_order(text):
         note = note.replace(customer, "", 1)
         note = note.replace(product, "", 1)
 
-        # 只移除單價
+        # 移除數量+單位（例如 5箱、10件）
+        if qty is not None:
+            qty_text = (
+                str(int(qty))
+                if float(qty).is_integer()
+                else str(qty)
+            )
+
+            note = note.replace(
+                f"{qty_text}{unit}",
+                "",
+                1
+            )
+
+        # 移除單價
         note = re.sub(
             r"@\d+(?:\.\d+)?",
             "",
@@ -729,7 +743,11 @@ def create_schedule_order(text):
         if delivery:
             note = note.replace(delivery, "")
 
-        note = note.strip()
+        note = re.sub(
+            r"\s+",
+            " ",
+            note
+        ).strip()
 
         today = now_tw().date()
 
@@ -986,7 +1004,21 @@ def create_schedule_order(text):
     if product:
         note = note.replace(product, "", 1)
 
-    # 只移除單價
+    # 移除數量+單位（例如 5箱、10件）
+    if qty is not None:
+        qty_text = (
+            str(int(qty))
+            if float(qty).is_integer()
+            else str(qty)
+        )
+
+        note = note.replace(
+            f"{qty_text}{unit}",
+            "",
+            1
+        )
+
+    # 移除單價
     note = re.sub(
         r"@\d+(?:\.\d+)?|@",
         "",
@@ -1002,7 +1034,11 @@ def create_schedule_order(text):
         note
     )
 
-    note = note.strip()
+    note = re.sub(
+        r"\s+",
+        " ",
+        note
+    ).strip()
 
     weekday_map = {
         "一":0,
