@@ -2146,7 +2146,6 @@ def delete_order(text, user_id, rows):
     if len(parts) < 2:
         return "❌ 刪單格式錯誤"
 
-    
     deleted = 0
 
     delete_batch = now_tw().strftime("%Y%m%d%H%M%S")
