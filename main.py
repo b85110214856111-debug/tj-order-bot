@@ -2143,6 +2143,13 @@ def query_order(text, rows):
     return "\n".join(lines)
 
 def delete_order(text, user_id, rows):
+    # 統一日期區間符號
+    text = (
+        text.replace("－", "-")   # 全形 -
+            .replace("–", "-")   # en dash
+            .replace("—", "-")   # em dash
+            .replace("～", "~")   # 全形 ~
+    )
     parts = text.split()
     if len(parts) < 2:
         return "❌ 刪單格式錯誤"
