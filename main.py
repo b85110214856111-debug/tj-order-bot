@@ -324,9 +324,9 @@ def download_file_bytes(url):
     return None
 
 
-def export_orders(keyword="全部", start_date=None, end_date=None):
+def export_orders(rows, keyword="全部", start_date=None, end_date=None):
 
-    rows = sheet.get_all_values()
+    
 
     wb = Workbook()
     ws = wb.active
@@ -1215,9 +1215,9 @@ UNIT_WHITELIST = [
     "K","k"
 ]
 
-def edit_order(text):
+def edit_order(text, rows):
 
-    rows = sheet.get_all_values()
+    
     text = text.strip()
     text = normalize_symbols(text)
 
@@ -1228,6 +1228,8 @@ def edit_order(text):
     ]
 
     updated_total = 0
+
+    batch_updates = []
 
     for block in blocks:
 
@@ -1400,30 +1402,55 @@ def edit_order(text):
                     continue
 
             # =========================
-            # 寫入更新
+            # 收集更新資料
             # =========================
+
             if "日期" in updates:
-                sheet.update_cell(row_no, 3, updates["日期"])
+                batch_updates.append({
+                    "range": f"C{row_no}",
+                    "values": [[updates["日期"]]]
+                })
 
             if "商品" in updates:
-                sheet.update_cell(row_no, 5, updates["商品"])
+                batch_updates.append({
+                    "range": f"E{row_no}",
+                    "values": [[updates["商品"]]]
+                })
 
             if "數量" in updates:
-                sheet.update_cell(row_no, 6, updates["數量"])
+                batch_updates.append({
+                    "range": f"F{row_no}",
+                    "values": [[updates["數量"]]]
+                })
 
             if "單位" in updates:
-                sheet.update_cell(row_no, 7, updates["單位"])
+                batch_updates.append({
+                    "range": f"G{row_no}",
+                    "values": [[updates["單位"]]]
+                })
 
             if "單價" in updates:
-                sheet.update_cell(row_no, 8, updates["單價"])
+                batch_updates.append({
+                    "range": f"H{row_no}",
+                    "values": [[updates["單價"]]]
+                })
 
             if "配送" in updates:
-                sheet.update_cell(row_no, 9, updates["配送"])
+                batch_updates.append({
+                    "range": f"I{row_no}",
+                    "values": [[updates["配送"]]]
+                })
 
             if "備註" in updates:
-                sheet.update_cell(row_no, 10, updates["備註"])
+                batch_updates.append({
+                    "range": f"J{row_no}",
+                    "values": [[updates["備註"]]]
+                })
 
             updated_total += 1
+
+    if batch_updates:
+        sheet.batch_update(batch_updates)
 
     if updated_total == 0:
         return "❌ 找不到符合訂單"
@@ -1469,10 +1496,10 @@ def generate_order_ids(count):
         f"{today.strftime('%m%d')}"
     )
 
-    last_date = settings_sheet.acell("B1").value
-    last_seq = int(
-        settings_sheet.acell("B2").value or "0"
-    )
+    values = settings_sheet.batch_get(["B1:B2"])
+
+    last_date = values[0][0][0] if values[0] else ""
+    last_seq = int(values[0][1][0]) if len(values[0]) > 1 else 0
 
     # 換日歸零
     if last_date != roc_date:
@@ -1508,6 +1535,8 @@ def generate_order_id():
 
 def save_order(data, user_id):
 
+    now_str = now_tw().strftime("%Y-%m-%d %H:%M:%S")
+
     oid = generate_order_ids(1)[0]
 
     seq_no = oid[-3:]
@@ -1518,7 +1547,7 @@ def save_order(data, user_id):
 
     sheet.append_row([
         oid,
-        now_tw().strftime("%Y-%m-%d %H:%M:%S"),
+        now_str,
         data["date"],
         data["customer"],
         data["product"],
@@ -1545,6 +1574,8 @@ def save_orders_batch(
 
     rows = []
 
+    now_str = now_tw().strftime("%Y-%m-%d %H:%M:%S")
+
     order_ids = generate_order_ids(
         len(orders)
     )
@@ -1554,17 +1585,16 @@ def save_orders_batch(
         orders
     ):
 
-        order["date"] = format_date(
-            parse_date(order["date"])
-        )
+        if "/" in str(order["date"]):
+            order["date"] = format_date(
+                parse_date(order["date"])
+            )
 
         seq_no = oid[-3:]
 
         rows.append([
             oid,
-            now_tw().strftime(
-                "%Y-%m-%d %H:%M:%S"
-            ),
+            now_str,
             order["date"],
             order["customer"],
             order["product"],
@@ -2070,11 +2100,11 @@ def parse_customer_products(text):
     
     return orders
 
-def query_order(text):
+def query_order(text, rows):
     keyword = text.replace("查詢", "").strip()
     result = []
 
-    for r in sheet.get_all_values()[1:]:
+    for r in rows[1:]:
 
         # 跳過已刪除訂單
         status = r[11] if len(r) > 11 else ""
@@ -2111,12 +2141,12 @@ def query_order(text):
         lines.append(f"單號:{r[0]} 日期:{r[2]} 客戶:{r[3]} 商品:{r[4]} 數量:{qty}{unit} 配送:{delivery} 備註:{note}")
     return "\n".join(lines)
 
-def delete_order(text, user_id):
+def delete_order(text, user_id, rows):
     parts = text.split()
     if len(parts) < 2:
         return "❌ 刪單格式錯誤"
 
-    rows = sheet.get_all_values()
+    
     deleted = 0
 
     delete_batch = now_tw().strftime("%Y%m%d%H%M%S")
@@ -2225,7 +2255,7 @@ def delete_order(text, user_id):
 
     return f"✅ 已刪 {deleted} 筆" if deleted else "❌ 找不到訂單"
 
-def restore_order(text):
+def restore_order(text, rows):
     if text.strip() in ["復原最後刪除", "還原最後刪除"]:
         return restore_last_delete()
     parts = text.split()
@@ -2233,7 +2263,7 @@ def restore_order(text):
     if len(parts) < 2:
         return "❌ 復原格式錯誤"
 
-    rows = sheet.get_all_values()
+    
 
     restored = 0
 
@@ -2542,6 +2572,10 @@ def files():
 async def callback(request: Request):
     body = await request.json()
 
+    rows = sheet.get_all_values()
+    customer_rows = customer_sheet.get_all_values()
+    photo_rows = photo_sheet.get_all_values()
+
     for event in body["events"]:
 
         if event["type"] != "message":
@@ -2657,7 +2691,7 @@ async def callback(request: Request):
             if cmd.startswith("查詢"):
 
                 results.append(
-                    query_order(cmd)
+                    query_order(cmd, rows)
                 )
 
             elif cmd.startswith("匯出"):
@@ -2687,6 +2721,7 @@ async def callback(request: Request):
                         keyword = text
 
                 url = export_orders(
+                    rows,
                     keyword,
                     start_date,
                     end_date
@@ -2707,14 +2742,15 @@ async def callback(request: Request):
                 results.append(
                     delete_order(
                         cmd,
-                        user_name
+                        user_name,
+                        rows
                     )   
                 )
 
             elif cmd.startswith("改單"):
 
                 results.append(
-                    edit_order(cmd)
+                    edit_order(cmd, rows)
                 )
 
             elif cmd.startswith("客戶設定"):
@@ -2732,13 +2768,13 @@ async def callback(request: Request):
             elif cmd.startswith("復原"):
 
                 results.append(
-                    restore_order(cmd)
+                    restore_order(cmd, rows)
                 )
 
             elif cmd.startswith("還原"):
 
                 results.append(
-                    restore_order(cmd)
+                    restore_order(cmd, rows)
                 )
 
             elif (
