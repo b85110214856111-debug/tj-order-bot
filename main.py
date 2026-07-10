@@ -617,12 +617,8 @@ def create_schedule_order(text):
         rows = customer_sheet.get_all_values()
         customer_rows = rows[1:]
 
-        # 第三行：商品資料
-        order_text = lines[2]
-
-        parts = order_text.split()
-
-        product = parts[0] if len(parts) >= 1 else ""
+        # 商品清單（第三行開始）
+        product_lines = lines[2:]
 
 
         # 先保留輸入值
@@ -910,7 +906,52 @@ def create_schedule_order(text):
                         "note": note if note else "固定排程"
                     })
 
-        else:
+        for order_text in product_lines:
+
+            parts = order_text.split()
+
+            if not parts:
+                continue
+
+            product = parts[0]
+
+            qty = 0
+            unit = ""
+            price = 0
+            delivery = ""
+            note = order_text.replace(product, "", 1).strip()
+
+            # 數量
+            for p in parts[1:]:
+
+                m = re.match(r"(\d+(?:\.\d+)?)(.*)", p)
+
+                if m:
+                    qty = float(m.group(1))
+                    unit = parse_unit(m.group(2))
+                    break
+
+            # 單價
+            for p in parts:
+                if p.startswith("@"):
+                    try:
+                        price = float(p[1:])
+                    except:
+                        pass
+
+            # 配送
+            delivery = detect_delivery(order_text)
+
+            # 備註
+            note = order_text
+            note = note.replace(product, "", 1)
+            note = re.sub(r"\d+(?:\.\d+)?[^\s]*", "", note)
+            note = re.sub(r"@\d+(?:\.\d+)?", "", note)
+
+            if delivery:
+                note = note.replace(delivery, "")
+
+            note = re.sub(r"\s+", " ", note).strip()
 
             for date_str in target_dates:
 
