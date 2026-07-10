@@ -2320,8 +2320,6 @@ def restore_order(text):
         if restored
         else "❌ 找不到已刪除訂單"
         )
-
-    
     
     # 日期 + 客戶
 
