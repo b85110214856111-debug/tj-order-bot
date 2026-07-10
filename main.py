@@ -633,39 +633,7 @@ def create_schedule_order(text):
         price = 0
 
 
-        # 找 Customers 同商品補缺
-        for r in rows[1:]:
-
-            if len(r) < 4:
-                continue
-
-            if r[0] == customer and r[1] == product:
-
-                qty_match = re.search(
-                    r"(\d+(?:\.\d+)?)",
-                    r[2]
-                )
-
-                if qty_match:
-                    qty = float(qty_match.group(1))
-                    unit = parse_unit(r[2])
-
-                try:
-                    price = float(r[3])
-                except:
-                    price = 0
-
-                break
-
-
-        # 輸入優先覆蓋
-
-        if input_qty:
-            qty = input_qty
-            unit = input_unit
-
-        if input_price:
-            price = input_price
+        
 
 
         weekday_map = {
@@ -678,72 +646,7 @@ def create_schedule_order(text):
             "日":6
         }    
 
-        # 數量
-        for p in parts[1:]:
-
-            m = re.match(r"(\d+(?:\.\d+)?)(.*)", p)
-
-            if not m:
-                continue
-
-            qty = float(m.group(1))
-
-            remain = m.group(2).strip()
-
-            if remain:
-                unit = parse_unit(remain)
-
-            break
-
-        # 單價
-        for p in parts:
-
-            if p.startswith("@"):
-                try:
-                    price = float(p[1:])
-                except:
-                    pass
-
-        # 配送
-        delivery = detect_delivery(order_text)
-
-        # 備註
-        note = order_text
-
-        # 第三行沒有客戶，所以不用移除 customer
-        note = note.replace(product, "", 1)
-
-        # 移除數量+單位（例如 5箱、10件）
-        if qty is not None:
-            qty_text = (
-                str(int(qty))
-                if float(qty).is_integer()
-                else str(qty)
-            )
-
-            note = note.replace(
-                f"{qty_text}{unit}",
-                "",
-                1
-            )
-
-        # 移除單價
-        note = re.sub(
-            r"@\d+(?:\.\d+)?",
-            "",
-            note
-        )
-
-        note = note.replace("@", "")
-
-        if delivery:
-            note = note.replace(delivery, "")
-
-        note = re.sub(
-            r"\s+",
-            " ",
-            note
-        ).strip()
+        
 
         today = now_tw().date()
        
@@ -915,37 +818,70 @@ def create_schedule_order(text):
 
             product = parts[0]
 
+            # 先使用 Customers 預設值
             qty = 0
             unit = ""
             price = 0
             delivery = ""
-            note = order_text.replace(product, "", 1).strip()
+            note = ""
 
-            # 數量
+            for r in rows[1:]:
+
+                if len(r) < 4:
+                    continue
+
+                if r[0] == customer and r[1] == product:
+
+                    qty_match = re.search(
+                        r"(\d+(?:\.\d+)?)",
+                        r[2]
+                    )
+
+                    if qty_match:
+                        qty = float(qty_match.group(1))
+                        unit = parse_unit(r[2])
+
+                    try:
+                        price = float(r[3])
+                    except:
+                        price = 0
+
+                    break
+
+            # 商品輸入覆蓋 Customers
             for p in parts[1:]:
 
                 m = re.match(r"(\d+(?:\.\d+)?)(.*)", p)
 
                 if m:
                     qty = float(m.group(1))
-                    unit = parse_unit(m.group(2))
+
+                    if m.group(2):
+                        unit = parse_unit(m.group(2))
+
                     break
 
-            # 單價
             for p in parts:
+
                 if p.startswith("@"):
                     try:
                         price = float(p[1:])
                     except:
                         pass
 
-            # 配送
             delivery = detect_delivery(order_text)
 
-            # 備註
             note = order_text
             note = note.replace(product, "", 1)
-            note = re.sub(r"\d+(?:\.\d+)?[^\s]*", "", note)
+
+            qty_text = (
+                str(int(qty))
+                if float(qty).is_integer()
+                else str(qty)
+            )
+
+            note = note.replace(f"{qty_text}{unit}", "", 1)
+
             note = re.sub(r"@\d+(?:\.\d+)?", "", note)
 
             if delivery:
