@@ -457,9 +457,7 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
             unit,
             total_qty
         ])
-    excel_buffer = BytesIO()
-    wb.save(excel_buffer)
-    excel_buffer.seek(0)
+    
 
     zip_buffer = BytesIO()
 
@@ -517,19 +515,25 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
 
     zip_buffer.seek(0)
 
-    # ===========================
-    # 設定欄寬
-    # ===========================
-    ws.column_dimensions["A"].width = 80   # 單號
-    ws.column_dimensions["B"].width = 80   # 建立時間
-    ws.column_dimensions["C"].width = 80   # 日期
-    ws.column_dimensions["D"].width = 80   # 客戶
-    ws.column_dimensions["E"].width = 80   # 商品
-    ws.column_dimensions["F"].width = 80   # 數量
-    ws.column_dimensions["G"].width = 80   # 單位
-    ws.column_dimensions["H"].width = 80   # 單價
-    ws.column_dimensions["I"].width = 80   # 配送
-    ws.column_dimensions["J"].width = 80   # 備註
+    widths = {
+        "A": 80,  # 單號
+        "B": 80,  # 出貨日期
+        "C": 80,  # 客戶
+        "D": 80,  # 商品
+        "E": 80,  # 數量
+        "F": 80,  # 單位
+        "G": 80,  # 單價
+        "H": 80,  # 配送
+        "I": 80,  # 備註
+        "J": 80,  # 建立時間
+    }
+
+    for col, width in widths.items():
+        ws.column_dimensions[col].width = width
+
+    excel_buffer = BytesIO()
+    wb.save(excel_buffer)
+    excel_buffer.seek(0)
 
     url = upload_zip(zip_buffer.getvalue())
 
