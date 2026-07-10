@@ -2136,9 +2136,10 @@ def query_order(text, rows):
     for r in result[:50]:
         qty = r[5] if len(r) > 5 else ""
         unit = r[6] if len(r) > 6 else "件"
+        price = r[7] if len(r) > 7 else ""
         delivery = r[8] if len(r) > 8 else ""
         note = r[9] if len(r) > 9 else ""
-        lines.append(f"單號:{r[0]} 日期:{r[2]} 客戶:{r[3]} 商品:{r[4]} 數量:{qty}{unit} 配送:{delivery} 備註:{note}")
+        lines.append(f"單號:{r[0]} 日期:{r[2]} 客戶:{r[3]} 商品:{r[4]} 數量:{qty}{unit} 單價:{price} 配送:{delivery} 備註:{note}")
     return "\n".join(lines)
 
 def delete_order(text, user_id, rows):
