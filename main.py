@@ -520,16 +520,16 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
     # ===========================
     # 設定欄寬
     # ===========================
-    ws.column_dimensions["A"].width = 30   # 單號
-    ws.column_dimensions["B"].width = 30   # 建立時間
-    ws.column_dimensions["C"].width = 30   # 日期
-    ws.column_dimensions["D"].width = 30   # 客戶
-    ws.column_dimensions["E"].width = 30   # 商品
-    ws.column_dimensions["F"].width = 30   # 數量
-    ws.column_dimensions["G"].width = 30   # 單位
-    ws.column_dimensions["H"].width = 30   # 單價
-    ws.column_dimensions["I"].width = 30   # 配送
-    ws.column_dimensions["J"].width = 30   # 備註
+    ws.column_dimensions["A"].width = 80   # 單號
+    ws.column_dimensions["B"].width = 80   # 建立時間
+    ws.column_dimensions["C"].width = 80   # 日期
+    ws.column_dimensions["D"].width = 80   # 客戶
+    ws.column_dimensions["E"].width = 80   # 商品
+    ws.column_dimensions["F"].width = 80   # 數量
+    ws.column_dimensions["G"].width = 80   # 單位
+    ws.column_dimensions["H"].width = 80   # 單價
+    ws.column_dimensions["I"].width = 80   # 配送
+    ws.column_dimensions["J"].width = 80   # 備註
 
     url = upload_zip(zip_buffer.getvalue())
 
