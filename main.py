@@ -1252,11 +1252,26 @@ def edit_order(text, rows):
     text = text.strip()
     text = normalize_symbols(text)
 
-    blocks = [
-        b.strip()
-        for b in text.split("\n\n")
-        if b.strip()
+    lines = [
+        l.strip()
+        for l in text.splitlines()
+        if l.strip()
     ]
+
+    blocks = []
+    current = []
+
+    for line in lines:
+
+        # 遇到新的「改單」開始新區塊
+        if line.startswith("改單") and current:
+            blocks.append("\n".join(current))
+            current = []
+
+        current.append(line)
+
+    if current:
+        blocks.append("\n".join(current))
 
     updated_total = 0
 
@@ -1314,11 +1329,17 @@ def edit_order(text, rows):
                 continue
 
             # 第一個一定是商品名稱
-            target_product = parts[0]
-
             updates = {}
 
-            i = 1
+            # 判斷第一個是不是修改指令
+            if parts[0][:1] in ("@", "#", "*", "×", "+", "!"):
+                # 沒指定商品，代表全部商品
+                target_product = ""
+                i = 0
+            else:
+                # 第一個是商品名稱
+                target_product = parts[0]
+                i = 1
 
             while i < len(parts):
 
@@ -1390,11 +1411,14 @@ def edit_order(text, rows):
 
             for target_product, updates in item_updates:
 
-                if sheet_product != target_product:
-                    continue
+                # 沒指定商品＝全部商品
+                if target_product == "":
+                    matched = True
+                    break
 
-                matched = True
-                break
+                if sheet_product == target_product:
+                    matched = True
+                    break
 
             if not matched:
                 continue
