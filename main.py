@@ -335,15 +335,15 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
 
     ws.append([
         "單號",
-        "出貨日期",
+        "建立時間",
+        "日期",
         "客戶",
         "商品",
         "數量",
         "單位",
         "單價",
         "配送",
-        "備註",
-        "建立時間",
+        "備註"
     ])
 
     count = 0
@@ -420,16 +420,16 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
     for r in export_rows:
 
         ws.append([
-            r[0], # 單號
-            r[2], # 出貨日期
-            r[3], # 客戶
-            r[4], # 商品
-            r[5], # 數量
-            r[6], # 單位
-            r[7], # 單價
-            r[8], # 配送
-            r[9],  # 備註
-            r[1] # 建立時間
+            r[0],
+            r[1],
+            r[2],
+            r[3],
+            r[4],
+            r[5],
+            r[6],
+            r[7],
+            r[8],
+            r[9]
         ])
 
     if count == 0:
@@ -457,7 +457,9 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
             unit,
             total_qty
         ])
-    
+    excel_buffer = BytesIO()
+    wb.save(excel_buffer)
+    excel_buffer.seek(0)
 
     zip_buffer = BytesIO()
 
@@ -514,26 +516,6 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
 
 
     zip_buffer.seek(0)
-
-    widths = {
-        "A": 80,  # 單號
-        "B": 80,  # 出貨日期
-        "C": 80,  # 客戶
-        "D": 80,  # 商品
-        "E": 80,  # 數量
-        "F": 80,  # 單位
-        "G": 80,  # 單價
-        "H": 80,  # 配送
-        "I": 80,  # 備註
-        "J": 80,  # 建立時間
-    }
-
-    for col, width in widths.items():
-        ws.column_dimensions[col].width = width
-
-    excel_buffer = BytesIO()
-    wb.save(excel_buffer)
-    excel_buffer.seek(0)
 
     url = upload_zip(zip_buffer.getvalue())
 
