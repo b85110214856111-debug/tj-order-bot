@@ -717,14 +717,9 @@ def create_schedule_order(text):
         note = note.replace(customer, "", 1)
         note = note.replace(product, "", 1)
 
+        # 只移除單價
         note = re.sub(
             r"@\d+(?:\.\d+)?",
-            "",
-            note
-        )
-
-        note = re.sub(
-            r"\d+(?:\.\d+)?[^\s]*",
             "",
             note
         )
@@ -991,13 +986,7 @@ def create_schedule_order(text):
     if product:
         note = note.replace(product, "", 1)
 
-    note = re.sub(
-        r"\d+(?:\.\d+)?[^\s]*",
-        "",
-        note
-    )
-
-    # 移除單價符號
+    # 只移除單價
     note = re.sub(
         r"@\d+(?:\.\d+)?|@",
         "",
@@ -1007,7 +996,6 @@ def create_schedule_order(text):
     for d in DELIVERY_LIST:
         note = note.replace(d, "")
 
-    # 移除排程文字
     note = re.sub(
         r"每週[一二三四五六日]+到貨到月底",
         "",
