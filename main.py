@@ -1303,12 +1303,22 @@ def edit_order(text, rows):
         # =========================
         # 2️⃣ 修改內容解析
         # =========================
-        updates = {}
+
+        item_updates = []
 
         for line in lines[1:]:
 
             parts = line.split()
-            i = 0
+
+            if not parts:
+                continue
+
+            # 第一個一定是商品名稱
+            target_product = parts[0]
+
+            updates = {}
+
+            i = 1
 
             while i < len(parts):
 
@@ -1320,66 +1330,45 @@ def edit_order(text, rows):
                     if m:
                         updates["單價"] = m.group(1)
 
-                # ===== 改日期 =====
+                # ===== 日期 =====
                 elif token.startswith("#"):
-
                     try:
-
-                        updates["日期"] = format_date(
-                            parse_date(token[1:])
-                        )
-
+                        updates["日期"] = format_date(parse_date(token[1:]))
                     except:
+                        pass
 
-                        continue
-
-                # ===== 改商品（🔥重點）=====
+                # ===== 商品名稱 =====
                 elif token.startswith("*"):
                     updates["商品"] = token[1:]
 
-                # ===== 數量（支援 ×5、×5包、× 5包）=====
+                # ===== 數量 =====
                 elif token.startswith("×"):
 
                     v = token[1:].strip()
 
-                    # 支援 × 5包
                     if not v and i + 1 < len(parts):
                         i += 1
-                        v = parts[i].strip()
+                        v = parts[i]
 
                     m = re.match(r"(\d+(?:\.\d+)?)(.*)", v)
 
                     if m:
-
-                        # 數量
                         updates["數量"] = m.group(1)
 
-                        # 單位
-                        remain = m.group(2).strip()
-
-                        if remain:
-                            updates["單位"] = parse_unit(remain)
+                        if m.group(2):
+                            updates["單位"] = parse_unit(m.group(2))
 
                 # ===== 配送 =====
                 elif token.startswith("+"):
-                    v = token[1:]
-                    if not v and i + 1 < len(parts):
-                        i += 1
-                        v = parts[i]
-                    updates["配送"] = v
-
-                # ===== 單位 =====
-                elif token.startswith("&"):
-                    updates["單位"] = token[1:]
+                    updates["配送"] = token[1:]
 
                 # ===== 備註 =====
                 elif token.startswith("!"):
-                    v = token[1:]
-                    if not v:
-                        v = " ".join(parts[i+1:])
-                    updates["備註"] = v
+                    updates["備註"] = token[1:]
 
                 i += 1
+
+            item_updates.append((target_product, updates))
 
         # =========================
         # 3️⃣ 套用更新
@@ -1396,6 +1385,19 @@ def edit_order(text, rows):
                 continue
             sheet_customer = str(r[3]).strip()
             sheet_product = str(r[4]).strip()
+
+            matched = False
+
+            for target_product, updates in item_updates:
+
+                if sheet_product != target_product:
+                    continue
+
+                matched = True
+                break
+
+            if not matched:
+                continue
 
             # 日期條件
             if dates:
