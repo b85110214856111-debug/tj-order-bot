@@ -750,10 +750,40 @@ def create_schedule_order(text):
         ).strip()
 
         today = now_tw().date()
-
-        
        
-        
+        # ===============================
+        # 下個月起，每個月初送（3個月）
+        # ===============================
+        if "下個月起" in lines[1] and "每個月初送" in lines[1]:
+
+            year = today.year
+            month = today.month + 1
+
+            if month > 12:
+                month = 1
+                year += 1
+
+            for _ in range(3):
+
+                for day in range(1, 8):      # 每月1~7號
+
+                    try:
+                        d = date(year, month, day)
+
+                        date_str = format_date(d)
+
+                        if date_str not in added_dates:
+                            added_dates.add(date_str)
+                            target_dates.append(date_str)
+
+                    except:
+                        pass
+
+                month += 1
+
+                if month > 12:
+                    month = 1
+                    year += 1
 
         # 下週四、五到貨
 
@@ -2738,9 +2768,15 @@ async def callback(request: Request):
         user_name = get_user_name(user_id)
         text = text.replace("周", "週")
         if (
-            "\n" in text
-            and "下週" in text
-            and "之後每週" in text
+            (
+                "下週" in text
+                and "之後每週" in text
+            )
+            or
+            (
+                "下個月起" in text
+                and "每個月初送" in text
+            )
         ):
 
             reply = create_schedule_order(text)
@@ -2872,14 +2908,19 @@ async def callback(request: Request):
                 )
 
             elif (
-                "下週" in cmd
-                and "之後每週" in cmd
+                ("下週" in cmd and "之後每週" in cmd)
+                or
+                ("下個月起" in cmd and "每個月初送" in cmd)
             ):
                 results.append(
                     create_schedule_order(cmd)
                 )
             
-            elif "每週" in cmd and "到貨" in cmd:
+            elif (
+                ("每週" in cmd and "到貨" in cmd)
+                or
+                ("下個月起" in cmd and "每個月初送" in cmd)
+            ):
 
                 results.append(
                     create_schedule_order(cmd)
