@@ -335,15 +335,15 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
 
     ws.append([
         "單號",
-        "建立時間",
-        "日期",
+        "出貨日期",
         "客戶",
         "商品",
         "數量",
         "單位",
         "單價",
         "配送",
-        "備註"
+        "備註",
+        "建立時間",
     ])
 
     count = 0
@@ -420,16 +420,16 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
     for r in export_rows:
 
         ws.append([
-            r[0],
-            r[1],
-            r[2],
-            r[3],
-            r[4],
-            r[5],
-            r[6],
-            r[7],
-            r[8],
-            r[9]
+            r[0], # 單號
+            r[2], # 出貨日期
+            r[3], # 客戶
+            r[4], # 商品
+            r[5], # 數量
+            r[6], # 單位
+            r[7], # 單價
+            r[8], # 配送
+            r[9],  # 備註
+            r[1] # 建立時間
         ])
 
     if count == 0:
