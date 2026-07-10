@@ -2151,6 +2151,71 @@ def delete_order(text, user_id, rows):
 
     delete_batch = now_tw().strftime("%Y%m%d%H%M%S")
 
+        # ===== 日期區間刪除 =====
+    m = re.search(
+        rf"({DATE_PATTERN})\s*[~-]\s*({DATE_PATTERN})",
+        text
+    )
+
+    if m:
+
+        start_date = m.group(1)
+        end_date = m.group(2)
+
+        remain = (
+            text.replace("刪單", "", 1)
+                .replace(m.group(0), "")
+                .strip()
+        )
+
+        args = remain.split()
+
+        customer = args[0] if len(args) >= 1 else ""
+        product = args[1] if len(args) >= 2 else ""
+
+        for i in range(len(rows), 1, -1):
+
+            r = rows[i - 1]
+
+            status = r[11] if len(r) > 11 else ""
+
+            if status == "已刪除":
+                continue
+
+            try:
+                if not in_date_range(
+                    r[2],
+                    start_date,
+                    end_date
+                ):
+                    continue
+            except:
+                continue
+
+            if customer and r[3] != customer:
+                continue
+
+            if product and r[4] != product:
+                continue
+
+            sheet.update(
+                f"L{i}:O{i}",
+                [[
+                    "已刪除",
+                    now_tw().strftime("%Y-%m-%d %H:%M:%S"),
+                    user_id,
+                    delete_batch
+                ]]
+            )
+
+            deleted += 1
+
+        return (
+            f"✅ 已刪 {deleted} 筆"
+            if deleted
+            else "❌ 找不到訂單"
+        )
+
     if parts[1].isdigit():
         for i in range(len(rows),1,-1):
             r = rows[i - 1]
