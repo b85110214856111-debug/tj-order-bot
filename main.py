@@ -1756,12 +1756,18 @@ def parse_order_line(line):
     if i + 1 >= len(parts):
         return None
 
-    qty_match = re.search(r"(\d+(?:\.\d+)?)", parts[i + 1])
-    if not qty_match:
-        return None
+    # 支援「全出」
+    if parts[i + 1] == "全出":
+        qty = "全出"
+        unit = ""
+    else:
+        qty_match = re.search(r"(\d+(?:\.\d+)?)", parts[i + 1])
 
-    qty = float(qty_match.group(1))
-    unit = parse_unit(parts[i + 1])
+        if not qty_match:
+            return None
+
+        qty = float(qty_match.group(1))
+        unit = parse_unit(parts[i + 1])
 
     price_match = re.search(r"@(\d+(?:\.\d+)?)", line)
     price = float(price_match.group(1)) if price_match else 0
@@ -1894,44 +1900,49 @@ def parse_multi_customer_order(text):
         if not current_dates:
             continue
 
-        m = re.match(
-            r"(.+?)\s+(\d+(?:\.\d+)?)([^\d\s]+)?(?:\s+@(\d+(?:\.\d+)?))?(.*)",
-            line
-        )
+        parts = line.split()
 
-        if not m:
+        if len(parts) < 2:
             continue
 
-        product = m.group(1).strip()
+        product = parts[0]
 
-        qty = float(m.group(2))
+        qty_text = parts[1]
 
-        unit_text = m.group(3) or ""
+        # ===== 數量 =====
+        if qty_text == "全出":
+            qty = "全出"
+            unit = ""
+        else:
+            m = re.match(r"(\d+(?:\.\d+)?)(.*)", qty_text)
 
-        unit = "件"
-        remain_unit_note = unit_text
+            if not m:
+                continue
 
-        for u in sorted(
-            UNIT_WHITELIST,
-            key=len,
-            reverse=True
-        ):
-            if remain_unit_note.startswith(u):
+            qty = float(m.group(1))
 
-                unit = u
+            unit = parse_unit(m.group(2))
 
-                remain_unit_note = (
-                    remain_unit_note[len(u):]
-                    .strip()
-                )
+        price = 0
+        delivery = ""
+        note_list = []
 
-                break
+        for p in parts[2:]:
 
-        price = float(m.group(4)) if m.group(4) else 0
+            if p.startswith("@"):
+                try:
+                    price = float(p[1:])
+                except:
+                    pass
+                continue
 
-        remain = (
-            remain_unit_note + " " + m.group(5)
-        ).strip()
+            if p in DELIVERY_LIST:
+                delivery = p
+                continue
+
+            note_list.append(p)
+
+        note = " ".join(note_list)
 
         delivery = detect_delivery(remain)
 
@@ -2001,15 +2012,20 @@ def parse_same_product_orders(text):
         note = ""
 
         # 第二欄：數量+單位
-        m = re.match(r"(\d+(?:\.\d+)?)(.*)", parts[1])
+        # 支援全出
+        if parts[1] == "全出":
+            qty = "全出"
+            unit = ""
+        else:
+            m = re.match(r"(\d+(?:\.\d+)?)(.*)", parts[1])
 
-        if not m:
-            continue
+            if not m:
+                continue
 
-        qty = float(m.group(1))
+            qty = float(m.group(1))
 
-        if m.group(2):
-            unit = parse_unit(m.group(2))
+            if m.group(2):
+                unit = parse_unit(m.group(2))
 
         remain = []
 
@@ -2253,6 +2269,12 @@ def parse_customer_date_blocks(text):
         for p in parts[1:]:
 
             # 數量
+            # 支援全出
+            if p == "全出":
+                qty = "全出"
+                unit = ""
+                continue
+
             m = re.match(r"(\d+(?:\.\d+)?)(.*)", p)
 
             if m:
