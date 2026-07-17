@@ -2851,7 +2851,7 @@ def expand_date_range(text):
 
 def expand_short_dates(text):
 
-    pattern = r'(\d{1,2}/\d{1,2})((?:[\'、,\s]+(?:\d{1,2}/)?\d{1,2})+)'
+    pattern = r'(\d{1,2}/\d{1,2})((?:[\｀、,\s]+(?:\d{1,2}/)?\d{1,2})+)'
 
     def repl(m):
 
