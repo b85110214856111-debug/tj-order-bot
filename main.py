@@ -1240,7 +1240,6 @@ DATE_PATTERN = r"(?:\d{4}/)?\d{1,2}/\d{1,2}"
 UNIT_WHITELIST = [
     "包","袋","箱","件","桶","噸","盒","籃",
     "公斤","斤","公克",
-    "全出",
     "kg","KG","Kg",
     "g","G",
     "lb","LB","lbs",
@@ -1752,12 +1751,19 @@ def parse_order_line(line):
     if i + 1 >= len(parts):
         return None
 
-    qty_match = re.search(r"(\d+(?:\.\d+)?)", parts[i + 1])
-    if not qty_match:
-        return None
+    qty_text = parts[i + 1].strip()
 
-    qty = float(qty_match.group(1))
-    unit = parse_unit(parts[i + 1])
+    # 支援「全出」
+    if qty_text == "全出":
+        qty = "全出"
+        unit = ""
+    else:
+        qty_match = re.search(r"(\d+(?:\.\d+)?)", qty_text)
+        if not qty_match:
+            return None
+
+        qty = float(qty_match.group(1))
+        unit = parse_unit(qty_text)
 
     price_match = re.search(r"@(\d+(?:\.\d+)?)", line)
     price = float(price_match.group(1)) if price_match else 0
