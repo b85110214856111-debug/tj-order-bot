@@ -1716,6 +1716,11 @@ def parse_order_line(line):
     if len(parts) < 4:
         return None
 
+    text = text.strip()
+
+    if text.startswith("追加"):
+        text = text[2:].strip()
+
     # ===== 日期、客戶解析（支援多日期）=====
     dates = []
     i = 0
@@ -1807,6 +1812,11 @@ def parse_order_line(line):
     return orders if len(orders) > 1 else orders[0]
 
 def parse_multi_customer_order(text):
+
+    text = text.strip()
+
+    if text.startswith("追加"):
+        text = text[2:].strip()
 
     lines = [x.strip() for x in text.splitlines()]
 
@@ -1951,6 +1961,11 @@ def parse_multi_customer_order(text):
 
 def parse_same_product_orders(text):
 
+    text = text.strip()
+
+    if text.startswith("追加"):
+        text = text[2:].strip()
+
     lines = [x.strip() for x in text.splitlines() if x.strip()]
 
     if len(lines) < 2:
@@ -2061,6 +2076,12 @@ def parse_same_product_orders(text):
     return orders
 
 def parse_customer_products(text):
+
+    text = text.strip()
+
+    if text.startswith("追加"):
+        text = text[2:].strip()
+
     lines = [x.strip() for x in text.splitlines() if x.strip()]
 
     rows = customer_sheet.get_all_values()
@@ -2579,7 +2600,8 @@ def restore_last_delete():
 
 def smart_parse(text: str):
     text = text.strip()
-
+    if text.startswith("追加"):
+        text = text[2:].strip()
     # 統一符號
     text = (
         text.replace("／", "/")
@@ -2824,7 +2846,8 @@ async def callback(request: Request):
         results = []
 
         for cmd in commands:
-
+            if cmd.startswith("追加"):
+                cmd = cmd[2:].strip()
             cmd = cmd.replace("周", "週")
             if cmd.startswith("查詢"):
 
