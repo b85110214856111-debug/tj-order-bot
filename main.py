@@ -1413,7 +1413,10 @@ def edit_order(text, rows):
 
                 # ===== 備註 =====
                 elif token.startswith("!"):
-                    updates["備註"] = token[1:]
+                    updates["備註"] = " ".join(
+                        [token[1:]] + parts[i+1:]
+                    )
+                    break
 
                 i += 1
 
@@ -2782,7 +2785,7 @@ def smart_parse(text: str):
             .replace(")", "）")
     )
     text = expand_short_dates(text)
-    
+
     result = {
         "customer": "",
         "dates": [],
