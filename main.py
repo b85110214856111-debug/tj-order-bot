@@ -2128,6 +2128,21 @@ def parse_customer_products(text):
     if not lines:
         return orders
 
+    # 支援：客戶 日期 同一行
+    if lines:
+
+        m = re.match(
+            rf"^(.+?)\s+({DATE_PATTERN})$",
+            lines[0]
+        )
+
+        if m:
+
+            customer = m.group(1).strip()
+
+            date = m.group(2).strip()
+
+            lines = [customer, date] + lines[1:]
     # ====================================================
     # 新格式：
     #
