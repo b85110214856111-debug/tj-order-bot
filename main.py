@@ -2175,9 +2175,6 @@ def parse_customer_products(text):
 
     if start_index >= 0:
 
-        customer = lines[0]
-        current_date = ""
-
         for line in lines[start_index:]:
 
             # 日期
