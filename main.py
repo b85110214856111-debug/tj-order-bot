@@ -2178,6 +2178,135 @@ def parse_customer_products(text):
     
     return orders
 
+def parse_customer_date_blocks(text):
+
+    text = text.strip()
+
+    if text.startswith("追加"):
+        text = text[2:].strip()
+
+    rows = customer_sheet.get_all_values()
+
+    orders = []
+
+    customer = ""
+    current_date = ""
+
+    lines = [
+        x.strip()
+        for x in text.splitlines()
+        if x.strip()
+    ]
+
+    for line in lines:
+
+        # ===== 日期 =====
+        if re.match(f"^{DATE_PATTERN}$", line):
+
+            current_date = format_date(
+                parse_date(line)
+            )
+            continue
+
+        # ===== 客戶 =====
+        if (
+            not current_date
+            and
+            not re.search(r"\d", line)
+        ):
+            customer = line
+            continue
+
+        if not customer or not current_date:
+            continue
+
+        parts = line.split()
+
+        if not parts:
+            continue
+
+        product = parts[0]
+
+        qty = 0
+        unit = ""
+        price = 0
+        delivery = ""
+        note = ""
+
+        # Customers 預設價格
+        for r in rows[1:]:
+
+            if len(r) < 4:
+                continue
+
+            if r[0] == customer and r[1] == product:
+
+                try:
+                    price = float(r[3])
+                except:
+                    price = 0
+
+                break
+
+        remain = []
+
+        for p in parts[1:]:
+
+            # 數量
+            m = re.match(r"(\d+(?:\.\d+)?)(.*)", p)
+
+            if m:
+
+                qty = float(m.group(1))
+
+                if m.group(2):
+                    unit = parse_unit(m.group(2))
+
+                continue
+
+            # 單價
+            if p.startswith("@"):
+
+                try:
+                    price = float(p[1:])
+                except:
+                    pass
+
+                continue
+
+            # 配送
+            if p in DELIVERY_LIST:
+
+                delivery = p
+
+                continue
+
+            remain.append(p)
+
+        note = " ".join(remain).strip()
+
+        orders.append({
+
+            "date": current_date,
+
+            "customer": customer,
+
+            "product": product,
+
+            "qty": qty,
+
+            "unit": unit,
+
+            "price": price,
+
+            "delivery": delivery,
+
+            "note": note
+
+        })
+
+    return orders
+
 def query_order(text, rows):
     keyword = text.replace("查詢", "").strip()
     result = []
@@ -2975,15 +3104,20 @@ async def callback(request: Request):
 
     # 新格式：客戶 商品
                     # 新格式
+                    # 新格式
                     if (
                         not is_header_line(lines[0])
                         and not re.match(r"\d{1,2}/\d{1,2}$", lines[0])
                     ):
 
-    # 先試客戶獨立格式
-                        orders = parse_customer_products(cmd)
+                        # 客戶→日期→商品 (新格式)
+                        orders = parse_customer_date_blocks(cmd)
 
-    # 不符合再試原本格式
+                        # 客戶→商品→日期
+                        if not orders:
+                            orders = parse_customer_products(cmd)
+
+                        # 客戶+商品固定，下面多日期
                         if not orders:
                             orders = parse_same_product_orders(cmd)
 
