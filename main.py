@@ -2813,6 +2813,42 @@ def restore_last_delete():
 
     return f"✅ 已復原最後一次刪除，共 {restored} 筆"
 
+def expand_date_range(text):
+
+    pattern = r'(\d{1,2}/\d{1,2})\s*[~-]\s*(\d{1,2}/\d{1,2}|\d{1,2})'
+
+    def repl(m):
+
+        start = m.group(1)
+        end = m.group(2)
+
+        sm, sd = map(int, start.split("/"))
+
+        if "/" in end:
+            em, ed = map(int, end.split("/"))
+        else:
+            em = sm
+            ed = int(end)
+
+        start_date = datetime(2000, sm, sd)
+        end_date = datetime(2000, em, ed)
+
+        # 跨年
+        if end_date < start_date:
+            end_date = datetime(2001, em, ed)
+
+        result = []
+
+        d = start_date
+
+        while d <= end_date:
+            result.append(f"{d.month}/{d.day}")
+            d += timedelta(days=1)
+
+        return " ".join(result)
+
+    return re.sub(pattern, repl, text)
+
 def expand_short_dates(text):
 
     pattern = r'(\d{1,2}/\d{1,2})((?:[\'、,\s]+(?:\d{1,2}/)?\d{1,2})+)'
@@ -3036,6 +3072,7 @@ async def callback(request: Request):
         user_id = event["source"]["userId"]
         user_name = get_user_name(user_id)
         text = text.replace("周", "週")
+        text = expand_date_range(text)
         text = expand_short_dates(text)
         if (
             (
