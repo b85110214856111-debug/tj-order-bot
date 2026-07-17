@@ -2140,16 +2140,45 @@ def parse_customer_products(text):
     # 商品 數量
     # ====================================================
 
-    if (
+    customer = ""
+    current_date = ""
+    start_index = 0
+
+    m = re.match(
+        rf"^(.*?)\s+({DATE_PATTERN})$",
+        lines[0]
+    )
+
+    if m:
+
+        customer = m.group(1).strip()
+
+        current_date = format_date(
+            parse_date(m.group(2))
+        )
+
+        start_index = 1
+
+    elif (
         len(lines) >= 2
         and not re.match(f"^{DATE_PATTERN}$", lines[0])
         and re.match(f"^{DATE_PATTERN}$", lines[1])
     ):
 
         customer = lines[0]
+
+        start_index = 1
+
+    else:
+
+        start_index = -1
+
+    if start_index >= 0:
+
+        customer = lines[0]
         current_date = ""
 
-        for line in lines[1:]:
+        for line in lines[start_index:]:
 
             # 日期
             if re.match(f"^{DATE_PATTERN}$", line):
@@ -2163,12 +2192,15 @@ def parse_customer_products(text):
             if not current_date:
                 continue
 
-            parts = line.split()
+            m = re.match(
+                r"(.+?)\s+((?:全出)|(?:\d+(?:\.\d+)?))([^\d\s@]*)\s*(.*)",
+                line
+            )
 
-            if len(parts) < 2:
+            if not m:
                 continue
 
-            product = parts[0]
+            product = m.group(1).strip()
 
             qty = 0
             unit = ""
@@ -2176,21 +2208,17 @@ def parse_customer_products(text):
             delivery = ""
             note = ""
 
-            qty_text = parts[1].strip()
+            qty_text = m.group(2)
 
-            # 支援「全出」
+            # 支援全出
             if qty_text == "全出":
                 qty = "全出"
-                unit = ""
             else:
-                m = re.match(
-                    r"(\d+(?:\.\d+)?)\s*(.*)",
-                    qty_text
-                )
+                qty = float(qty_text)
 
-                if m:
-                    qty = float(m.group(1))
-                    unit = parse_unit(m.group(2))
+            unit = parse_unit(m.group(3))
+
+            text2 = m.group(4).strip()
 
             # 預設價格
             for r in rows[1:]:
@@ -2208,7 +2236,7 @@ def parse_customer_products(text):
 
                     break
 
-            text2 = " ".join(parts[2:])
+            
 
             # @單價
             m = re.search(r"@(\d+(?:\.\d+)?)", text2)
