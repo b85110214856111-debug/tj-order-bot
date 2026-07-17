@@ -103,33 +103,6 @@ def parse_date_range(start_text, end_text):
 def format_date(d):
     return d.strftime(DATE_FORMAT)
 
-def expand_dates(text):
-
-    text = (
-        text.replace("、", " ")
-            .replace("，", " ")
-            .replace(",", " ")
-            .replace("｀", " ")   # 全形反引號
-            .replace("`", " ")    # 半形反引號
-            .strip()
-    )  
-
-    result = []
-    month = None
-
-    for t in text.split():
-
-        m = re.match(r"^(\d{1,2})/(\d{1,2})$", t)
-
-        if m:
-            month = m.group(1)
-            result.append(t)
-            continue
-
-        if month and re.match(r"^\d{1,2}$", t):
-            result.append(f"{month}/{t}")
-
-    return result
 
 def date_key(text):
     return parse_date(text)
@@ -1863,11 +1836,10 @@ def parse_multi_customer_order(text):
         if not line:
             continue
 
-        dates = expand_dates(line)
-
+        # 日期分隔符統一
         header = (
             line.replace("、", " ")
-            .replace("，", " ")
+        .replace("，", " ")
             .replace(",", " ")
         )
 
@@ -1876,26 +1848,34 @@ def parse_multi_customer_order(text):
         
 
         # 日期在前
-        if dates:
+        if tokens and re.match(f"^{DATE_PATTERN}$", tokens[0]):
 
-            current_dates = dates
+            i = 0
 
-            i = len(dates)
+            while i < len(tokens):
+
+                if re.match(f"^{DATE_PATTERN}$", tokens[i]):
+                    current_dates.append(tokens[i])
+                    i += 1
+                else:
+                    break
 
             current_customer = " ".join(tokens[i:])
-
-            continue
-
-            
 
         # 只有第一行才解析日期/客戶
         if tokens:
 
-            if dates:
+            # 日期在前
+            if re.match(r"\d{1,2}/\d{1,2}$", tokens[0]):
 
-                current_dates = dates
+                current_dates = []
 
-                current_customer = " ".join(tokens[len(dates):])
+                i = 0
+                while i < len(tokens) and re.match(r"\d{1,2}/\d{1,2}$", tokens[i]):
+                    current_dates.append(tokens[i])
+                    i += 1
+
+                current_customer = " ".join(tokens[i:])
 
                 continue
 
@@ -2228,15 +2208,11 @@ def parse_customer_date_blocks(text):
     for line in lines:
 
         # ===== 日期 =====
-        dates = expand_dates(line)
+        if re.match(f"^{DATE_PATTERN}$", line):
 
-        if dates:
-
-            current_dates = [
-                format_date(parse_date(d))
-                for d in dates
-            ]
-
+            current_date = format_date(
+                parse_date(line)
+            )
             continue
 
         # ===== 客戶 =====
@@ -2322,18 +2298,25 @@ def parse_customer_date_blocks(text):
 
         note = " ".join(remain).strip()
 
-        for d in current_dates:
+        orders.append({
 
-            orders.append({
-                "date": d,
-                "customer": customer,
-                "product": product,
-                "qty": qty,
-                "unit": unit,
-                "price": price,
-                "delivery": delivery,
-                "note": note
-            })
+            "date": current_date,
+
+            "customer": customer,
+
+            "product": product,
+
+            "qty": qty,
+
+            "unit": unit,
+
+            "price": price,
+
+            "delivery": delivery,
+
+            "note": note
+
+        })
 
     return orders
 
