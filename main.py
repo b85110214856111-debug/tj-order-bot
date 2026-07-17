@@ -2755,6 +2755,11 @@ async def callback(request: Request):
 
         text = text.strip()
 
+        # ===== 追加下單 =====
+        if text.startswith("追加"):
+
+            text = text[2:].strip()
+
         # 統一全形符號
         text = (
             text.replace("／", "/")
