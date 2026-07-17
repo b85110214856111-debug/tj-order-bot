@@ -3057,6 +3057,8 @@ async def callback(request: Request):
         for cmd in commands:
 
             cmd = cmd.replace("周", "週")
+            # 支援「追加」指令
+            cmd = re.sub(r"^追加\s*", "", cmd)
             if cmd.startswith("查詢"):
 
                 results.append(
