@@ -109,8 +109,10 @@ def expand_dates(text):
         text.replace("、", " ")
             .replace("，", " ")
             .replace(",", " ")
+            .replace("｀", " ")   # 全形反引號
+            .replace("`", " ")    # 半形反引號
             .strip()
-    )
+    )  
 
     result = []
     month = None
