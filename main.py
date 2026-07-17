@@ -1944,11 +1944,6 @@ def parse_multi_customer_order(text):
 
         note = " ".join(note_list)
 
-        for d in DELIVERY_LIST:
-            note = note.replace(d, "")
-
-        note = note.strip()
-
         for d in current_dates:
             d = format_date(
                 parse_date(d)
