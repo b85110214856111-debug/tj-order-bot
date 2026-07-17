@@ -1944,10 +1944,6 @@ def parse_multi_customer_order(text):
 
         note = " ".join(note_list)
 
-        delivery = detect_delivery(remain)
-
-        note = remain
-
         for d in DELIVERY_LIST:
             note = note.replace(d, "")
 
