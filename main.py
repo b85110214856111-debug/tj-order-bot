@@ -2815,25 +2815,33 @@ def restore_last_delete():
 
 def expand_short_dates(text):
 
-    def repl(match):
+    pattern = r'(\d{1,2}/\d{1,2})((?:[\'、,\s]+(?:\d{1,2}/)?\d{1,2})+)'
 
-        first = match.group(1)          # 7/21
-        tail = match.group(2)           # '25'28'30
+    def repl(m):
+
+        first = m.group(1)
+        tail = m.group(2)
 
         month = first.split("/")[0]
 
-        dates = [first]
+        result = [first]
 
-        for d in re.findall(r"'(\d{1,2})", tail):
-            dates.append(f"{month}/{d}")
+        for item in re.findall(r'(?:\d{1,2}/)?\d{1,2}', tail):
 
-        return " ".join(dates)
+            if "/" in item:
+                month = item.split("/")[0]
+                day = item.split("/")[1]
+            else:
+                day = item
 
-    return re.sub(
-        r"(\d{1,2}/\d{1,2})((?:'\d{1,2})+)",
-        repl,
-        text
-    )
+            date = f"{month}/{day}"
+
+            if date not in result:
+                result.append(date)
+
+        return " ".join(result)
+
+    return re.sub(pattern, repl, text)
 
 def smart_parse(text: str):
     text = text.strip()
