@@ -103,6 +103,34 @@ def parse_date_range(start_text, end_text):
 def format_date(d):
     return d.strftime(DATE_FORMAT)
 
+def expand_short_dates(text: str):
+    """
+    支援
+    7/1、2、3、4
+    7/1,2,3,4
+    7/1，2，3，4
+    7/1｀2｀3｀4
+    ↓
+    7/1 7/2 7/3 7/4
+    """
+
+    text = (
+        text.replace("，", "、")
+            .replace(",", "、")
+            .replace("｀", "、")
+    )
+
+    pattern = r'(\d{1,2})/(\d{1,2}(?:、\d{1,2})+)'
+
+    def repl(m):
+        month = m.group(1)
+        days = m.group(2).split("、")
+        return " ".join(
+            f"{month}/{d}"
+            for d in days
+        )
+
+    return re.sub(pattern, repl, text)
 
 def date_key(text):
     return parse_date(text)
@@ -2753,7 +2781,8 @@ def smart_parse(text: str):
             .replace("(", "（")
             .replace(")", "）")
     )
-
+    text = expand_short_dates(text)
+    
     result = {
         "customer": "",
         "dates": [],
@@ -2933,7 +2962,7 @@ async def callback(request: Request):
                 .replace("(", "（")
                 .replace(")", "）")
         )
-
+        text = expand_short_dates(text)
     # ============================
 
         user_id = event["source"]["userId"]
