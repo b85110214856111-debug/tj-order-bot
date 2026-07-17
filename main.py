@@ -2813,6 +2813,28 @@ def restore_last_delete():
 
     return f"✅ 已復原最後一次刪除，共 {restored} 筆"
 
+def expand_short_dates(text):
+
+    def repl(match):
+
+        first = match.group(1)          # 7/21
+        tail = match.group(2)           # '25'28'30
+
+        month = first.split("/")[0]
+
+        dates = [first]
+
+        for d in re.findall(r"'(\d{1,2})", tail):
+            dates.append(f"{month}/{d}")
+
+        return " ".join(dates)
+
+    return re.sub(
+        r"(\d{1,2}/\d{1,2})((?:'\d{1,2})+)",
+        repl,
+        text
+    )
+
 def smart_parse(text: str):
     text = text.strip()
 
@@ -3006,6 +3028,7 @@ async def callback(request: Request):
         user_id = event["source"]["userId"]
         user_name = get_user_name(user_id)
         text = text.replace("周", "週")
+        text = expand_short_dates(text)
         if (
             (
                 "下週" in text
