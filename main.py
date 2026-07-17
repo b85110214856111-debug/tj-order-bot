@@ -2158,6 +2158,119 @@ def parse_customer_products(text):
     
     return orders
 
+def parse_customer_date_products(text):
+
+    lines = [x.strip() for x in text.splitlines()]
+
+    if not lines:
+        return []
+
+    rows = customer_sheet.get_all_values()
+
+    customer = ""
+    current_date = ""
+    orders = []
+
+    for line in lines:
+
+        if not line:
+            continue
+
+        # 第一個客戶
+        if customer == "":
+            customer = line
+            continue
+
+        # 日期
+        if re.match(f"^{DATE_PATTERN}$", line):
+
+            current_date = format_date(
+                parse_date(line)
+            )
+
+            continue
+
+        # 商品
+        if not current_date:
+            continue
+
+        m = re.match(
+            r"(.+?)\s+(\d+(?:\.\d+)?)(.*)",
+            line
+        )
+
+        if not m:
+            continue
+
+        product = m.group(1).strip()
+
+        qty = float(m.group(2))
+
+        remain = m.group(3).strip()
+
+        unit = parse_unit(remain)
+
+        price = 0
+        delivery = ""
+        note = ""
+
+        # Customers 預設單價
+        for r in rows[1:]:
+
+            if len(r) < 4:
+                continue
+
+            if r[0] == customer and r[1] == product:
+
+                try:
+                    price = float(r[3])
+                except:
+                    price = 0
+
+                break
+
+        # @單價
+        m2 = re.search(r"@(\d+(?:\.\d+)?)", remain)
+
+        if m2:
+            price = float(m2.group(1))
+
+        delivery = detect_delivery(remain)
+
+        note = remain
+
+        note = re.sub(r"@\d+(?:\.\d+)?", "", note)
+
+        if unit:
+            note = note.replace(unit, "", 1)
+
+        if delivery:
+            note = note.replace(delivery, "", 1)
+
+        note = re.sub(r"\s+", " ", note).strip()
+
+        orders.append({
+
+            "date": current_date,
+
+            "customer": customer,
+
+            "product": product,
+
+            "qty": qty,
+
+            "unit": unit,
+
+            "price": price,
+
+            "delivery": delivery,
+
+            "note": note
+
+        })
+
+    return orders
+
 def query_order(text, rows):
     keyword = text.replace("查詢", "").strip()
     result = []
@@ -2957,6 +3070,9 @@ async def callback(request: Request):
                         orders = parse_customer_products(cmd)
 
     # 不符合再試原本格式
+                        if not orders:
+                            orders = parse_customer_date_products(cmd)
+
                         if not orders:
                             orders = parse_same_product_orders(cmd)
 
