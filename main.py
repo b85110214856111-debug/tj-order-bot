@@ -851,6 +851,12 @@ def create_schedule_order(text):
             # 商品輸入覆蓋 Customers
             for p in parts[1:]:
 
+                # 支援「全出」
+                if p == "全出":
+                    qty = "全出"
+                    unit = ""
+                    break
+
                 m = re.match(r"(\d+(?:\.\d+)?)(.*)", p)
 
                 if m:
@@ -969,6 +975,12 @@ def create_schedule_order(text):
             product = parts[1]
     # 數量
     for p in parts[1:]:
+
+        # 支援「全出」
+        if p == "全出":
+            qty = "全出"
+            unit = ""
+            break
 
         m = re.match(r"(\d+(?:\.\d+)?)(.*)", p)
 
@@ -1371,13 +1383,18 @@ def edit_order(text, rows):
                         i += 1
                         v = parts[i]
 
-                    m = re.match(r"(\d+(?:\.\d+)?)(.*)", v)
+                    # 支援「×全出」
+                    if v == "全出":
+                        updates["數量"] = "全出"
+                        updates["單位"] = ""
+                    else:
+                        m = re.match(r"(\d+(?:\.\d+)?)(.*)", v)
 
-                    if m:
-                        updates["數量"] = m.group(1)
+                        if m:
+                            updates["數量"] = m.group(1)
 
-                        if m.group(2):
-                            updates["單位"] = parse_unit(m.group(2))
+                            if m.group(2):
+                                updates["單位"] = parse_unit(m.group(2))
 
                 # ===== 配送 =====
                 elif token.startswith("+"):
@@ -1901,12 +1918,36 @@ def parse_multi_customer_order(text):
 
         product = m.group(1).strip()
 
-        qty = float(m.group(2))
+        qty_text = m.group(2).strip()
 
-        unit_text = m.group(3) or ""
+        # 支援「全出」
+        if qty_text == "全出":
+            qty = "全出"
+            unit = ""
+            remain_unit_note = ""
+        else:
+            qty = float(qty_text)
 
-        unit = "件"
-        remain_unit_note = unit_text
+            unit_text = m.group(3) or ""
+
+            unit = "件"
+            remain_unit_note = unit_text
+
+            for u in sorted(
+                UNIT_WHITELIST,
+                key=len,
+                reverse=True
+            ):
+                if remain_unit_note.startswith(u):
+
+                    unit = u
+
+                    remain_unit_note = (
+                        remain_unit_note[len(u):]
+                        .strip()
+                    )
+
+                    break
 
         for u in sorted(
             UNIT_WHITELIST,
@@ -1993,15 +2034,22 @@ def parse_same_product_orders(text):
         note = ""
 
         # 第二欄：數量+單位
-        m = re.match(r"(\d+(?:\.\d+)?)(.*)", parts[1])
+        qty_text = parts[1].strip()
 
-        if not m:
-            continue
+        # 支援「全出」
+        if qty_text == "全出":
+            qty = "全出"
+            unit = ""
+        else:
+            m = re.match(r"(\d+(?:\.\d+)?)(.*)", qty_text)
 
-        qty = float(m.group(1))
+            if not m:
+                continue
 
-        if m.group(2):
-            unit = parse_unit(m.group(2))
+            qty = float(m.group(1))
+
+            if m.group(2):
+                unit = parse_unit(m.group(2))
 
         remain = []
 
@@ -2128,18 +2176,21 @@ def parse_customer_products(text):
             delivery = ""
             note = ""
 
-            m = re.match(
-                r"(\d+(?:\.\d+)?)\s*(.*)",
-                parts[1]
-            )
+            qty_text = parts[1].strip()
 
-            if m:
-
-                qty = float(m.group(1))
-
-                unit = parse_unit(
-                    m.group(2)
+            # 支援「全出」
+            if qty_text == "全出":
+                qty = "全出"
+                unit = ""
+            else:
+                m = re.match(
+                    r"(\d+(?:\.\d+)?)\s*(.*)",
+                    qty_text
                 )
+
+                if m:
+                    qty = float(m.group(1))
+                    unit = parse_unit(m.group(2))
 
             # 預設價格
             for r in rows[1:]:
@@ -2236,20 +2287,21 @@ def parse_customer_products(text):
             # 數量
             if len(parts) >= 2:
 
-                m = re.match(
-                    r"(\d+(?:\.\d+)?)(.*)",
-                    parts[1]
-                )
+                qty_text = parts[1].strip()
 
-                if m:
-
-                    qty = float(
-                        m.group(1)
+                # 支援「全出」
+                if qty_text == "全出":
+                    qty = "全出"
+                    unit = ""
+                else:
+                    m = re.match(
+                        r"(\d+(?:\.\d+)?)(.*)",
+                        qty_text
                     )
 
-                    unit = parse_unit(
-                        m.group(2)
-                    )
+                    if m:
+                        qty = float(m.group(1))
+                        unit = parse_unit(m.group(2))
 
             # Customers 預設價格
             for r in rows[1:]:
