@@ -1716,10 +1716,10 @@ def parse_order_line(line):
     if len(parts) < 4:
         return None
 
-    text = text.strip()
+    line = line.strip()
 
-    if text.startswith("追加"):
-        text = text[2:].strip()
+    if line.startswith("追加"):
+        line = line[2:].strip()
 
     # ===== 日期、客戶解析（支援多日期）=====
     dates = []
