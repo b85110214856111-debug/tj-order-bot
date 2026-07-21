@@ -2261,6 +2261,28 @@ def parse_customer_date_blocks(text):
         if x.strip()
     ]
 
+    # ===== 最後一行當共同配送/備註 =====
+    common_delivery = ""
+    common_note = ""
+
+    if len(lines) >= 2:
+
+        last_line = lines[-1]
+
+        # 如果最後一行不是商品，就當共同設定
+        if not re.search(r"\d", last_line) and not last_line.startswith("@"):
+
+            common_delivery = detect_delivery(last_line)
+
+            common_note = last_line
+
+            for d in DELIVERY_LIST:
+                common_note = common_note.replace(d, "")
+
+            common_note = common_note.strip()
+
+            lines = lines[:-1]
+
     for line in lines:
 
         # ===== 日期 =====
@@ -2370,9 +2392,9 @@ def parse_customer_date_blocks(text):
 
             "price": price,
 
-            "delivery": delivery,
-
-            "note": note
+            "delivery": delivery if delivery else common_delivery,
+            
+            "note": note if note else common_note
 
         })
 
