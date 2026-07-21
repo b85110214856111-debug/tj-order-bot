@@ -2261,51 +2261,6 @@ def parse_customer_date_blocks(text):
         if x.strip()
     ]
 
-    # ===== 日期+客戶同一行 =====
-    if lines:
-
-        m = re.match(
-            rf"^({DATE_PATTERN})\s+(.+)$",
-            lines[0]
-        )
-
-        if m:
-
-            current_date = format_date(
-                parse_date(m.group(1))
-            )
-
-            customer = m.group(2)
-
-            lines = lines[1:]
-
-    # ===== 最後一行共同配送/備註 =====
-
-    common_delivery = ""
-    common_note = ""
-
-    if len(lines) >= 2:
-
-        last_line = lines[-1]
-
-    # 判斷最後一行不是商品
-    # 商品通常會有 數量 / 全出 / @價格
-        if not re.search(
-            r"(\d+(?:\.\d+)?[^\s]*|全出|@\S+)",
-            last_line
-        ):
-
-            temp = last_line.split()
-
-            if temp:
-
-                common_delivery = temp[0]
-
-                if len(temp) > 1:
-                    common_note = " ".join(temp[1:])
-
-            lines = lines[:-1]
-
     for line in lines:
 
         # ===== 日期 =====
@@ -2415,12 +2370,12 @@ def parse_customer_date_blocks(text):
 
             "price": price,
 
-            "delivery": delivery if delivery else common_delivery,
+            "delivery": delivery,
 
-            "note": note if note else common_note
+            "note": note
 
         })
-    print("解析結果:", orders)
+
     return orders
 
 def query_order(text, rows):
