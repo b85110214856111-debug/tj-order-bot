@@ -1376,12 +1376,14 @@ def edit_order(text, rows):
                 # ===== 單價 =====
                 if token.startswith("@"):
 
-                    price_text = token[1:]
+                    price_text = token[1:].strip()
 
-                    try:
-                        updates["單價"] = str(float(price_text))
-                    except:
-                        updates["單價"] = price_text
+                    # 沒有價格或不是數字，直接忽略
+                    if not re.fullmatch(r"\d+(?:\.\d+)?", price_text):
+                        i += 1
+                        continue
+
+                    updates["單價"] = str(float(price_text))
 
                 # ===== 日期 =====
                 elif token.startswith("#"):
