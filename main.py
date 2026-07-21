@@ -1444,19 +1444,24 @@ def edit_order(text, rows):
 
             matched = False
 
+            matched_updates = None
+
             for target_product, updates in item_updates:
 
-                # 沒指定商品＝全部商品
+                # 沒指定商品才代表全部商品
                 if target_product == "":
-                    matched = True
+                    matched_updates = updates
                     break
 
-                if sheet_product == target_product:
-                    matched = True
+                # 指定商品必須完全相同
+                if sheet_product.strip() == target_product.strip():
+                    matched_updates = updates
                     break
 
-            if not matched:
+            if matched_updates is None:
                 continue
+
+            updates = matched_updates
 
             # 日期條件
             if dates:
