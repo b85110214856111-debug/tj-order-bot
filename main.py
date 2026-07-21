@@ -2288,16 +2288,21 @@ def parse_customer_date_blocks(text):
 
         last_line = lines[-1]
 
-        # 最後一行沒有商品數量，視為共同配送備註
-        if not re.search(r"\d+\s*(件|箱|斤|包|個|顆)", last_line):
+    # 判斷最後一行不是商品
+    # 商品通常會有 數量 / 全出 / @價格
+        if not re.search(
+            r"(\d+(?:\.\d+)?[^\s]*|全出|@\S+)",
+            last_line
+        ):
 
             temp = last_line.split()
 
-            if len(temp) >= 1:
+            if temp:
+
                 common_delivery = temp[0]
 
-            if len(temp) >= 2:
-                common_note = " ".join(temp[1:])
+                if len(temp) > 1:
+                    common_note = " ".join(temp[1:])
 
             lines = lines[:-1]
 
