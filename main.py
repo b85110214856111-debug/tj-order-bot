@@ -2420,7 +2420,7 @@ def parse_customer_date_blocks(text):
             "note": note if note else common_note
 
         })
-
+    print("解析結果:", orders)
     return orders
 
 def query_order(text, rows):
