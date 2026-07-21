@@ -1379,7 +1379,7 @@ def edit_order(text, rows):
                     price_text = token[1:].strip()
 
                     # 允許 @前價
-                    if price_text == "前價":
+                    if price_text in ("前價", "訂"):
                         updates["單價"] = "前價"
 
                     # 允許 @80、@80.5
@@ -2974,25 +2974,21 @@ async def callback(request: Request):
         
         # ===== 移除 LINE Mention =====
 
-        mentionees = []
+        # ===== 移除 LINE Mention =====
 
         if "mention" in event["message"]:
-            mentionees = event["message"]["mention"].get(
-                "mentionees",
-                []
-            )
 
-        for m in reversed(mentionees):
+            for m in event["message"]["mention"].get("mentionees", []):
 
-            start = m["index"]
-            length = m["length"]
+                name = (
+                    m.get("mentionee", {})
+                    .get("displayName", "")
+                )
 
-            text = (
-                text[:start]
-                + text[start + length:]
-            )
+                if name:
+                    text = text.replace(f"@{name}", "")
 
-        text = text.strip()
+        text = re.sub(r"\s+", " ", text).strip()
 
         # ===== 追加下單 =====
         if text.startswith("追加"):
