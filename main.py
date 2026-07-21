@@ -1989,12 +1989,13 @@ def parse_multi_customer_order(text):
 
             if p.startswith("@"):
 
-                price_text = p[1:]
+                if re.fullmatch(r'@\d+(\.\d+)?', p):
+                    price = float(p[1:])
+                    continue
 
-                try:
-                    price = float(price_text)
-                except:
-                    price = price_text
+                if p == "@前價":
+                    price = "前價"
+                    continue
 
                 continue
 
@@ -2206,13 +2207,17 @@ def parse_customer_products(text):
 
                 if p.startswith("@"):
 
-                    price_text = p[1:]
+                    # @999
+                    if re.fullmatch(r'@\d+(\.\d+)?', p):
+                        price = float(p[1:])
+                        continue
 
-                    try:
-                        price = float(price_text)
-                    except:
-                        price = price_text
+                    # @前價
+                    if p == "@前價":
+                        price = "前價"
+                        continue
 
+                    # @任何人、@BOT 全部忽略
                     continue
 
                 if p in DELIVERY_LIST:
@@ -2352,12 +2357,13 @@ def parse_customer_date_blocks(text):
             # 單價
             if p.startswith("@"):
 
-                price_text = p[1:]
+                if re.fullmatch(r'@\d+(\.\d+)?', p):
+                    price = float(p[1:])
+                    continue
 
-                try:
-                    price = float(price_text)
-                except:
-                    price = price_text
+                if p == "@前價":
+                    price = "前價"
+                    continue
 
                 continue
 
