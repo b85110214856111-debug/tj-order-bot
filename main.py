@@ -1989,13 +1989,12 @@ def parse_multi_customer_order(text):
 
             if p.startswith("@"):
 
-                if re.fullmatch(r'@\d+(\.\d+)?', p):
-                    price = float(p[1:])
-                    continue
+                price_text = p[1:]
 
-                if p == "@前價":
-                    price = "前價"
-                    continue
+                try:
+                    price = float(price_text)
+                except:
+                    price = price_text
 
                 continue
 
@@ -2207,17 +2206,13 @@ def parse_customer_products(text):
 
                 if p.startswith("@"):
 
-                    # @999
-                    if re.fullmatch(r'@\d+(\.\d+)?', p):
-                        price = float(p[1:])
-                        continue
+                    price_text = p[1:]
 
-                    # @前價
-                    if p == "@前價":
-                        price = "前價"
-                        continue
+                    try:
+                        price = float(price_text)
+                    except:
+                        price = price_text
 
-                    # @任何人、@BOT 全部忽略
                     continue
 
                 if p in DELIVERY_LIST:
@@ -2357,13 +2352,12 @@ def parse_customer_date_blocks(text):
             # 單價
             if p.startswith("@"):
 
-                if re.fullmatch(r'@\d+(\.\d+)?', p):
-                    price = float(p[1:])
-                    continue
+                price_text = p[1:]
 
-                if p == "@前價":
-                    price = "前價"
-                    continue
+                try:
+                    price = float(price_text)
+                except:
+                    price = price_text
 
                 continue
 
@@ -2980,21 +2974,25 @@ async def callback(request: Request):
         
         # ===== 移除 LINE Mention =====
 
-        # ===== 移除 LINE Mention =====
+        mentionees = []
 
         if "mention" in event["message"]:
+            mentionees = event["message"]["mention"].get(
+                "mentionees",
+                []
+            )
 
-            for m in event["message"]["mention"].get("mentionees", []):
+        for m in reversed(mentionees):
 
-                name = (
-                    m.get("mentionee", {})
-                    .get("displayName", "")
-                )
+            start = m["index"]
+            length = m["length"]
 
-                if name:
-                    text = text.replace(f"@{name}", "")
+            text = (
+                text[:start]
+                + text[start + length:]
+            )
 
-        text = re.sub(r"\s+", " ", text).strip()
+        text = text.strip()
 
         # ===== 追加下單 =====
         if text.startswith("追加"):
