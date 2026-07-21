@@ -2273,11 +2273,10 @@ def parse_customer_date_blocks(text):
 
         # ===== 客戶 =====
         if (
-            not current_date
-            and
             not re.search(r"\d", line)
         ):
             customer = line
+            current_date = ""      # 新客戶重新等待日期
             continue
 
         if not customer or not current_date:
