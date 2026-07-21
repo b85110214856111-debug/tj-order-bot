@@ -2261,6 +2261,47 @@ def parse_customer_date_blocks(text):
         if x.strip()
     ]
 
+    # ===== 日期+客戶同一行 =====
+    if lines:
+
+        m = re.match(
+            rf"^({DATE_PATTERN})\s+(.+)$",
+            lines[0]
+        )
+
+        if m:
+
+            current_date = format_date(
+                parse_date(m.group(1))
+            )
+
+            customer = m.group(2)
+
+            lines = lines[1:]
+
+    # ===== 最後一行共同配送/備註 =====
+
+    common_delivery = ""
+    common_note = ""
+
+    if len(lines) >= 2:
+
+        last_line = lines[-1]
+
+        # 最後一行沒有數字，視為共用設定
+        if not re.search(r"\d", last_line):
+
+            common_delivery = detect_delivery(last_line)
+
+            common_note = last_line
+
+            for d in DELIVERY_LIST:
+                common_note = common_note.replace(d, "")
+
+            common_note = common_note.strip()
+
+            lines = lines[:-1]
+
     for line in lines:
 
         # ===== 日期 =====
@@ -2370,9 +2411,9 @@ def parse_customer_date_blocks(text):
 
             "price": price,
 
-            "delivery": delivery,
+            "delivery": delivery if delivery else common_delivery,
 
-            "note": note
+            "note": note if note else common_note
 
         })
 
