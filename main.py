@@ -2288,17 +2288,21 @@ def parse_customer_date_blocks(text):
 
         last_line = lines[-1]
 
-        # 最後一行沒有數字，視為共用設定
+        # 最後一行沒有數字，視為共用配送備註
         if not re.search(r"\d", last_line):
 
-            common_delivery = detect_delivery(last_line)
+            temp = last_line.split()
 
-            common_note = last_line
+            remain_note = []
 
-            for d in DELIVERY_LIST:
-                common_note = common_note.replace(d, "")
+            for p in temp:
 
-            common_note = common_note.strip()
+                if p in DELIVERY_LIST:
+                    common_delivery = p
+                else:
+                    remain_note.append(p)
+
+            common_note = " ".join(remain_note).strip()
 
             lines = lines[:-1]
 
