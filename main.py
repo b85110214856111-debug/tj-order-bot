@@ -1424,7 +1424,9 @@ def edit_order(text, rows):
 
                 i += 1
 
-            item_updates.append((target_product, updates))
+            # 沒有任何修改內容就不要加入
+            if updates:
+                item_updates.append((target_product, updates))
 
         # =========================
         # 3️⃣ 套用更新
@@ -1442,24 +1444,23 @@ def edit_order(text, rows):
             sheet_customer = str(r[3]).strip()
             sheet_product = str(r[4]).strip()
 
-            matched = False
-
             matched_updates = None
 
-            for target_product, updates in item_updates:
+            for target_product, u in item_updates:
 
-                # 沒指定商品才代表全部商品
+                # 沒指定商品 -> 全部商品
                 if target_product == "":
-                    matched_updates = updates
+                    matched_updates = u
                     break
 
-                # 指定商品必須完全相同
+                # 指定商品
                 if sheet_product.strip() == target_product.strip():
-                    matched_updates = updates
+                    matched_updates = u
                     break
 
             if matched_updates is None:
                 continue
+
 
             updates = matched_updates
 
