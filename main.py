@@ -1378,12 +1378,18 @@ def edit_order(text, rows):
 
                     price_text = token[1:].strip()
 
-                    # 沒有價格或不是數字，直接忽略
-                    if not re.fullmatch(r"\d+(?:\.\d+)?", price_text):
+                    # 允許 @前價
+                    if price_text == "前價":
+                        updates["單價"] = "前價"
+
+                    # 允許 @80、@80.5
+                    elif re.fullmatch(r"\d+(?:\.\d+)?", price_text):
+                        updates["單價"] = str(float(price_text))
+
+                    # 其它 (@、@成員...) 一律忽略
+                    else:
                         i += 1
                         continue
-
-                    updates["單價"] = str(float(price_text))
 
                 # ===== 日期 =====
                 elif token.startswith("#"):
