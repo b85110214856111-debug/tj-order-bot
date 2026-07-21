@@ -1375,13 +1375,9 @@ def edit_order(text, rows):
 
                 # ===== 單價 =====
                 if token.startswith("@"):
-
-                    price_text = token[1:]
-
-                    try:
-                        updates["單價"] = str(float(price_text))
-                    except:
-                        updates["單價"] = price_text
+                    m = re.match(r"@(\d+(?:\.\d+)?)", token)
+                    if m:
+                        updates["單價"] = m.group(1)
 
                 # ===== 日期 =====
                 elif token.startswith("#"):
@@ -1804,17 +1800,8 @@ def parse_order_line(line):
         qty = float(qty_match.group(1))
         unit = parse_unit(parts[i + 1])
 
-    price_match = re.search(r"@([^\s]+)", line)
-
-    if price_match:
-        price_text = price_match.group(1)
-
-        try:
-            price = float(price_text)
-        except:
-            price = price_text
-    else:
-        price = 0
+    price_match = re.search(r"@(\d+(?:\.\d+)?)", line)
+    price = float(price_match.group(1)) if price_match else 0
 
     # ===== 配送、備註 =====
 
@@ -1974,14 +1961,10 @@ def parse_multi_customer_order(text):
         for p in parts[2:]:
 
             if p.startswith("@"):
-
-                price_text = p[1:]
-
                 try:
-                    price = float(price_text)
+                    price = float(p[1:])
                 except:
-                    price = price_text
-
+                    pass
                 continue
 
             if p in DELIVERY_LIST:
@@ -2072,14 +2055,10 @@ def parse_same_product_orders(text):
 
             # 單價
             if p.startswith("@"):
-
-                price_text = p[1:]
-
                 try:
-                    price = float(price_text)
+                    price = float(p[1:])
                 except:
-                    price = price_text
-
+                    pass
                 continue
 
             # 配送
@@ -2191,14 +2170,10 @@ def parse_customer_products(text):
             for p in parts[2:]:
 
                 if p.startswith("@"):
-
-                    price_text = p[1:]
-
                     try:
-                        price = float(price_text)
+                        price = float(p[1:])
                     except:
-                        price = price_text
-
+                        pass
                     continue
 
                 if p in DELIVERY_LIST:
@@ -2336,12 +2311,10 @@ def parse_customer_date_blocks(text):
             # 單價
             if p.startswith("@"):
 
-                price_text = p[1:]
-
                 try:
-                    price = float(price_text)
+                    price = float(p[1:])
                 except:
-                    price = price_text
+                    pass
 
                 continue
 
