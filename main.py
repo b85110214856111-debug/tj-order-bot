@@ -2984,8 +2984,11 @@ async def callback(request: Request):
 
         for m in reversed(mentionees):
 
-            start = m["index"]
-            length = m["length"]
+            start = m.get("index")
+            length = m.get("length")
+
+            if start is None or length is None:
+                continue
 
             text = (
                 text[:start]
