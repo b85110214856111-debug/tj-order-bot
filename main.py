@@ -2278,7 +2278,17 @@ def parse_customer_date_blocks(text):
 
     for line in lines:
 
-        # ===== 日期 =====
+        # ===== 日期 或 日期+客戶 =====
+
+        m = re.match(rf"^({DATE_PATTERN})\s+(.+)$", line)
+
+        if m:
+            current_date = format_date(
+                parse_date(m.group(1))
+            )
+            customer = m.group(2).strip()
+            continue
+
         if re.match(f"^{DATE_PATTERN}$", line):
 
             current_date = format_date(
