@@ -2971,7 +2971,12 @@ async def callback(request: Request):
 
         # ===== 以下才處理文字 =====
         text = event["message"]["text"]
-        
+        # 移除整行 Tag
+        text = re.sub(
+            r"(?m)^(\s*@\S+\s*)+$",
+            "",
+            text
+        ).strip()
         # ===== 移除 LINE Mention =====
 
         mentionees = []
@@ -2984,11 +2989,8 @@ async def callback(request: Request):
 
         for m in reversed(mentionees):
 
-            start = m.get("index")
-            length = m.get("length")
-
-            if start is None or length is None:
-                continue
+            start = m["index"]
+            length = m["length"]
 
             text = (
                 text[:start]
