@@ -2268,6 +2268,7 @@ def parse_customer_date_blocks(text):
 
     customer = ""
     current_date = ""
+    default_delivery = ""
 
     lines = [
         x.strip()
@@ -2288,6 +2289,12 @@ def parse_customer_date_blocks(text):
         # ===== 客戶 =====
         parts = line.split()
 
+        # 如果只有一個字，而且是配送方式，代表後面的商品都套用
+        if len(parts) == 1 and line in DELIVERY_LIST:
+            default_delivery = line
+            continue
+
+        # 客戶
         if (
             len(parts) == 1
             and not re.match(f"^{DATE_PATTERN}$", line)
@@ -2309,7 +2316,7 @@ def parse_customer_date_blocks(text):
         qty = 0
         unit = ""
         price = 0
-        delivery = ""
+        delivery = default_delivery
         note = ""
 
         # Customers 預設價格
