@@ -2971,12 +2971,7 @@ async def callback(request: Request):
 
         # ===== 以下才處理文字 =====
         text = event["message"]["text"]
-        # 移除整行 Tag
-        text = re.sub(
-            r"(?m)^(\s*@\S+\s*)+$",
-            "",
-            text
-        ).strip()
+        
         # ===== 移除 LINE Mention =====
 
         mentionees = []
@@ -3180,11 +3175,20 @@ async def callback(request: Request):
 
                 count = 0
 
-                lines = [
-                    x.strip()
-                    for x in cmd.splitlines()
-                    if x.strip()
-                ]
+                lines = []
+
+                for x in cmd.splitlines():
+
+                    x = x.strip()
+
+                    if not x:
+                        continue
+
+                    # 整行都是 LINE Tag 時直接忽略
+                    if re.fullmatch(r"(?:@\S+\s*)+", x):
+                        continue
+
+                    lines.append(x)
 
                 # ===== 多行訂單 =====
 
