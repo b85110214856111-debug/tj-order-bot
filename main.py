@@ -343,7 +343,7 @@ def init_sheets():
 
     raise Exception("Google Sheet無法連線")
 sheet, customer_sheet, settings_sheet, photo_sheet = init_sheets()
-DELIVERY_LIST = ["自取","自送","代送","業務自送","寄大榮","寄黑貓","寄順豐","寄梓華榮","送梓華榮"]
+DELIVERY_LIST = ["自取","自送","代送","業務自送","寄大榮","寄黑貓","寄順豐","寄梓華榮","送梓華榮","寄梓","寄大","送梓","司機自送","黑貓"]
 
 def download_file_bytes(url):
     r = requests.get(url, timeout=30)
