@@ -1647,12 +1647,9 @@ def save_order(data, user_id):
 
     seq_no = oid[-3:]
 
-    if data.get("date"):
-        data["date"] = format_date(
-            parse_date(data["date"])
-        )
-    else:
-        data["date"] = ""
+    data["date"] = format_date(
+        parse_date(data["date"])
+    )
 
     sheet.append_row([
         oid,
@@ -1666,7 +1663,7 @@ def save_order(data, user_id):
         data["delivery"],
         data["note"],
         user_id,
-        data.get("status", "正常"),
+        "正常",
         "",
         "",
         "",
@@ -1694,15 +1691,10 @@ def save_orders_batch(
         orders
     ):
 
-        if order.get("date"):
-
-            if "/" in str(order["date"]):
-
-                order["date"] = format_date(
-                    parse_date(order["date"])
-                )
-        else:
-            order["date"] = ""
+        if "/" in str(order["date"]):
+            order["date"] = format_date(
+                parse_date(order["date"])
+            )
 
         seq_no = oid[-3:]
 
@@ -1718,7 +1710,7 @@ def save_orders_batch(
             order["delivery"],
             order["note"],
             user_id,
-            order.get("status", "正常"),
+            "正常",
             "",
             "",
             "",
@@ -1769,17 +1761,15 @@ def is_header_line(line):
     return False
 
 def parse_order_line(line):
-    
-    
+    parts = line.split()
+    if len(parts) < 4:
+        return None
 
     line = line.strip()
 
     if line.startswith("追加"):
         line = line[2:].strip()
 
-    parts = line.split()
-    if len(parts) < 3:
-        return None
     # ===== 日期、客戶解析（支援多日期）=====
     dates = []
     i = 0
@@ -1807,24 +1797,10 @@ def parse_order_line(line):
             dates.append(parts[i])
             i += 1
 
-        # ===== 預訂(沒有日期) =====
-        if not dates:
+        if not dates or i >= len(parts):
+            return None
 
-            if len(parts) < 3:
-                return None
-
-            product = parts[1]
-            i = 2
-
-        else:
-
-            if i >= len(parts):
-                return None
-
-            product = parts[i]
-            i += 1
-
-    
+    product = parts[i]
 
     if i + 1 >= len(parts):
         return None
@@ -1882,15 +1858,10 @@ def parse_order_line(line):
 
     orders = []
 
-    # ===== 預訂沒有日期 =====
-    if not dates:
-        dates = [""]
-
     for d in dates:
-
-        if d:
-            d = format_date(parse_date(d))
-
+        d = format_date(
+            parse_date(d)
+        )
         orders.append({
             "date": d,
             "customer": customer,
@@ -3000,13 +2971,6 @@ async def callback(request: Request):
 
         # ===== 以下才處理文字 =====
         text = event["message"]["text"]
-
-        # ===== 預訂模式 =====
-        is_preorder = False
-
-        if text.startswith("預訂"):
-            is_preorder = True
-            text = text.replace("預訂", "", 1).strip()
         
         # ===== 移除 LINE Mention =====
 
@@ -3289,30 +3253,15 @@ async def callback(request: Request):
                             )
 
 # ===== 單行 =====
-                # ===== 單行 =====
                 else:
 
                     orders = []
 
-                    line = lines[0].strip()
-
-                    data = parse_order_line(line)
+                    data = parse_order_line(lines[0])
 
                     if isinstance(data, list):
-
-                        if is_preorder:
-                            for o in data:
-                                o["status"] = "預訂"
-                                o["date"] = ""
-
                         orders.extend(data)
-
                     elif data:
-
-                        if is_preorder:
-                            data["status"] = "預訂"
-                            data["date"] = ""
-
                         orders.append(data)
 
                     if orders:
