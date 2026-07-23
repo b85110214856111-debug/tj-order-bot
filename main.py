@@ -3294,13 +3294,7 @@ async def callback(request: Request):
 
                     orders = []
 
-                    # ===== 預訂 =====
                     line = lines[0].strip()
-                    is_preorder = False
-
-                    if line.startswith("預訂"):
-                        is_preorder = True
-                        line = line[2:].strip()
 
                     data = parse_order_line(line)
 
