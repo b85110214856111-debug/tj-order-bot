@@ -2033,7 +2033,8 @@ def parse_multi_customer_order(text):
 def parse_same_product_orders(text):
 
     text = text.strip()
-
+    if text.startswith("預計"):
+        text = text[2:].strip()
     if text.startswith("追加"):
         text = text[2:].strip()
 
@@ -2272,6 +2273,8 @@ def parse_customer_products(text):
 def parse_customer_date_blocks(text):
 
     text = text.strip()
+    if text.startswith("預計"):
+        text = text[2:].strip()
 
     if text.startswith("追加"):
         text = text[2:].strip()
