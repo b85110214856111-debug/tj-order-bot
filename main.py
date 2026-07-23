@@ -3289,15 +3289,36 @@ async def callback(request: Request):
                             )
 
 # ===== 單行 =====
+                # ===== 單行 =====
                 else:
 
                     orders = []
 
-                    data = parse_order_line(lines[0])
+                    # ===== 預訂 =====
+                    line = lines[0].strip()
+                    is_preorder = False
+
+                    if line.startswith("預訂"):
+                        is_preorder = True
+                        line = line[2:].strip()
+
+                    data = parse_order_line(line)
 
                     if isinstance(data, list):
+
+                        if is_preorder:
+                            for o in data:
+                                o["status"] = "預訂"
+                                o["date"] = ""
+
                         orders.extend(data)
+
                     elif data:
+
+                        if is_preorder:
+                            data["status"] = "預訂"
+                            data["date"] = ""
+
                         orders.append(data)
 
                     if orders:
