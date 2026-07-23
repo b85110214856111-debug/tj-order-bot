@@ -48,10 +48,6 @@ def parse_date(text: str, base=None):
     1/2
     """
 
-    # ⭐ 新增
-    if text == "預計":
-        return None
-
     text = text.strip().replace("-", "/")
 
     if base is None:
@@ -1651,10 +1647,9 @@ def save_order(data, user_id):
 
     seq_no = oid[-3:]
 
-    if data["date"] != "預計":
-        data["date"] = format_date(
-            parse_date(data["date"])
-        )
+    data["date"] = format_date(
+        parse_date(data["date"])
+    )
 
     sheet.append_row([
         oid,
@@ -1696,12 +1691,10 @@ def save_orders_batch(
         orders
     ):
 
-        if order["date"] != "預計":
-
-            if "/" in str(order["date"]):
-                order["date"] = format_date(
-                    parse_date(order["date"])
-                )
+        if "/" in str(order["date"]):
+            order["date"] = format_date(
+                parse_date(order["date"])
+            )
 
         seq_no = oid[-3:]
 
@@ -2033,8 +2026,7 @@ def parse_multi_customer_order(text):
 def parse_same_product_orders(text):
 
     text = text.strip()
-    if text.startswith("預計"):
-        text = text[2:].strip()
+
     if text.startswith("追加"):
         text = text[2:].strip()
 
@@ -2160,17 +2152,10 @@ def parse_customer_products(text):
 
     text = text.strip()
 
-    # ===== 預計訂單 =====
-    if text.startswith("預計"):
-        text = text[2:].strip()
-
     if text.startswith("追加"):
         text = text[2:].strip()
 
     lines = [x.strip() for x in text.splitlines() if x.strip()]
-
-    if not lines:
-        return []
 
     rows = customer_sheet.get_all_values()
 
@@ -2178,73 +2163,6 @@ def parse_customer_products(text):
 
     customer = ""
     product = ""
-
-    # ===== 預計格式 =====
-    if len(lines) >= 2 and not re.match(f"^{DATE_PATTERN}", lines[1]):
-
-        customer = lines[0]
-
-        for line in lines[1:]:
-
-            # 配送
-            if line in DELIVERY_LIST:
-                if orders:
-                    orders[-1]["delivery"] = line
-                continue
-
-            # 備註
-            if line.startswith("備註") or line.startswith("※"):
-                if orders:
-                    orders[-1]["note"] += " " + line
-                continue
-
-            m = re.match(
-                r"(.+?)\s+([0-9.]+|全出)(.*)",
-                line
-            )
-
-            if not m:
-                continue
-
-            product = m.group(1).strip()
-
-            qty_text = m.group(2)
-
-            remain = m.group(3).strip()
-
-            qty = 0
-
-            if qty_text == "全出":
-                qty = "全出"
-            else:
-                qty = float(qty_text)
-
-            unit = ""
-
-            price = ""
-
-            note = ""
-
-            for p in remain.split():
-
-                if p.startswith("@"):
-                    price = p[1:]
-                else:
-                    note += p + " "
-
-            orders.append({
-                "date": "預計",
-                "customer": customer,
-                "product": product,
-                "qty": qty,
-                "unit": unit,
-                "price": price,
-                "delivery": "",
-                "note": note.strip()
-            })
-
-        if orders:
-            return orders
 
     for i, line in enumerate(lines):
 
@@ -2340,8 +2258,6 @@ def parse_customer_products(text):
 def parse_customer_date_blocks(text):
 
     text = text.strip()
-    if text.startswith("預計"):
-        text = text[2:].strip()
 
     if text.startswith("追加"):
         text = text[2:].strip()
@@ -3093,13 +3009,6 @@ async def callback(request: Request):
                 .replace(")", "）")
         )
         text = expand_short_dates(text)
-        is_pending = False
-
-        if text.startswith("預計"):
-
-            is_pending = True
-
-            text = text[2:].strip()
     # ============================
 
         user_id = event["source"]["userId"]
@@ -3149,13 +3058,6 @@ async def callback(request: Request):
             commands = [text]
 
         results = []
-
-        # 預計訂單：把 cmd 也去掉「預計」
-        if is_pending:
-            commands = [
-                c[2:].strip() if c.startswith("預計") else c
-                for c in commands
-            ]
 
         for cmd in commands:
             if cmd.startswith("追加"):
@@ -3314,9 +3216,6 @@ async def callback(request: Request):
                             orders = parse_same_product_orders(cmd)
 
                         if orders:
-                            if is_pending:
-                                for order in orders:
-                                    order["date"] = "預計"
                             count = save_orders_batch(
                                 orders,
                                 user_name
@@ -3328,9 +3227,6 @@ async def callback(request: Request):
                         orders = parse_multi_customer_order(cmd)
 
                         if orders:
-                            if is_pending:
-                                for order in orders:
-                                    order["date"] = "預計"
                             count = save_orders_batch(
                                 orders,
                                 user_name
@@ -3351,9 +3247,6 @@ async def callback(request: Request):
                                 orders.append(data)
 
                         if orders:
-                            if is_pending:
-                                for order in orders:
-                                    order["date"] = "預計"
                             count = save_orders_batch(
                                 orders,
                                 user_name
@@ -3372,9 +3265,6 @@ async def callback(request: Request):
                         orders.append(data)
 
                     if orders:
-                        if is_pending:
-                            for order in orders:
-                                order["date"] = "預計"
                         count = save_orders_batch(
                             orders,
                             user_name
