@@ -2159,10 +2159,17 @@ def parse_customer_products(text):
 
     text = text.strip()
 
+    # ===== 預計訂單 =====
+    if text.startswith("預計"):
+        text = text[2:].strip()
+
     if text.startswith("追加"):
         text = text[2:].strip()
 
     lines = [x.strip() for x in text.splitlines() if x.strip()]
+
+    if not lines:
+        return []
 
     rows = customer_sheet.get_all_values()
 
