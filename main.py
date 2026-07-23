@@ -1805,10 +1805,24 @@ def parse_order_line(line):
             dates.append(parts[i])
             i += 1
 
-        if not dates or i >= len(parts):
-            return None
+        # ===== 預訂(沒有日期) =====
+        if not dates:
 
-    product = parts[i]
+            if len(parts) < 3:
+                return None
+
+            product = parts[1]
+            i = 2
+
+        else:
+
+            if i >= len(parts):
+                return None
+
+            product = parts[i]
+            i += 1
+
+    
 
     if i + 1 >= len(parts):
         return None
@@ -1866,10 +1880,15 @@ def parse_order_line(line):
 
     orders = []
 
+    # ===== 預訂沒有日期 =====
+    if not dates:
+        dates = [""]
+
     for d in dates:
-        d = format_date(
-            parse_date(d)
-        )
+
+        if d:
+            d = format_date(parse_date(d))
+
         orders.append({
             "date": d,
             "customer": customer,
