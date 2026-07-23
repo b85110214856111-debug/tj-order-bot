@@ -48,6 +48,10 @@ def parse_date(text: str, base=None):
     1/2
     """
 
+    # ⭐ 新增
+    if text == "預計":
+        return None
+
     text = text.strip().replace("-", "/")
 
     if base is None:
@@ -1647,9 +1651,10 @@ def save_order(data, user_id):
 
     seq_no = oid[-3:]
 
-    data["date"] = format_date(
-        parse_date(data["date"])
-    )
+    if data["date"] != "預計":
+        data["date"] = format_date(
+            parse_date(data["date"])
+        )
 
     sheet.append_row([
         oid,
@@ -1691,10 +1696,12 @@ def save_orders_batch(
         orders
     ):
 
-        if "/" in str(order["date"]):
-            order["date"] = format_date(
-                parse_date(order["date"])
-            )
+        if order["date"] != "預計":
+
+            if "/" in str(order["date"]):
+                order["date"] = format_date(
+                    parse_date(order["date"])
+                )
 
         seq_no = oid[-3:]
 
@@ -3009,6 +3016,13 @@ async def callback(request: Request):
                 .replace(")", "）")
         )
         text = expand_short_dates(text)
+        is_pending = False
+
+        if text.startswith("預計"):
+
+            is_pending = True
+
+            text = text[2:].strip()
     # ============================
 
         user_id = event["source"]["userId"]
@@ -3216,6 +3230,9 @@ async def callback(request: Request):
                             orders = parse_same_product_orders(cmd)
 
                         if orders:
+                            if is_pending:
+                                for order in orders:
+                                    order["date"] = "預計"
                             count = save_orders_batch(
                                 orders,
                                 user_name
@@ -3227,6 +3244,9 @@ async def callback(request: Request):
                         orders = parse_multi_customer_order(cmd)
 
                         if orders:
+                            if is_pending:
+                                for order in orders:
+                                    order["date"] = "預計"
                             count = save_orders_batch(
                                 orders,
                                 user_name
@@ -3247,6 +3267,9 @@ async def callback(request: Request):
                                 orders.append(data)
 
                         if orders:
+                            if is_pending:
+                                for order in orders:
+                                    order["date"] = "預計"
                             count = save_orders_batch(
                                 orders,
                                 user_name
@@ -3265,6 +3288,9 @@ async def callback(request: Request):
                         orders.append(data)
 
                     if orders:
+                        if is_pending:
+                            for order in orders:
+                                order["date"] = "預計"
                         count = save_orders_batch(
                             orders,
                             user_name
