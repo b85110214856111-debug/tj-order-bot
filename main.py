@@ -1647,9 +1647,12 @@ def save_order(data, user_id):
 
     seq_no = oid[-3:]
 
-    data["date"] = format_date(
-        parse_date(data["date"])
-    )
+    if data.get("date"):
+        data["date"] = format_date(
+            parse_date(data["date"])
+        )
+    else:
+        data["date"] = ""
 
     sheet.append_row([
         oid,
@@ -1663,7 +1666,7 @@ def save_order(data, user_id):
         data["delivery"],
         data["note"],
         user_id,
-        "正常",
+        data.get("status", "正常"),
         "",
         "",
         "",
@@ -1691,10 +1694,15 @@ def save_orders_batch(
         orders
     ):
 
-        if "/" in str(order["date"]):
-            order["date"] = format_date(
-                parse_date(order["date"])
-            )
+        if order.get("date"):
+
+            if "/" in str(order["date"]):
+
+                order["date"] = format_date(
+                    parse_date(order["date"])
+                )
+        else:
+            order["date"] = ""
 
         seq_no = oid[-3:]
 
@@ -1710,7 +1718,7 @@ def save_orders_batch(
             order["delivery"],
             order["note"],
             user_id,
-            "正常",
+            order.get("status", "正常"),
             "",
             "",
             "",
@@ -2971,6 +2979,13 @@ async def callback(request: Request):
 
         # ===== 以下才處理文字 =====
         text = event["message"]["text"]
+
+        # ===== 預訂模式 =====
+        is_preorder = False
+
+        if text.startswith("預訂"):
+            is_preorder = True
+            text = text.replace("預訂", "", 1).strip()
         
         # ===== 移除 LINE Mention =====
 
