@@ -2179,6 +2179,73 @@ def parse_customer_products(text):
     customer = ""
     product = ""
 
+    # ===== 預計格式 =====
+    if len(lines) >= 2 and not re.match(f"^{DATE_PATTERN}", lines[1]):
+
+        customer = lines[0]
+
+        for line in lines[1:]:
+
+            # 配送
+            if line in DELIVERY_LIST:
+                if orders:
+                    orders[-1]["delivery"] = line
+                continue
+
+            # 備註
+            if line.startswith("備註") or line.startswith("※"):
+                if orders:
+                    orders[-1]["note"] += " " + line
+                continue
+
+            m = re.match(
+                r"(.+?)\s+([0-9.]+|全出)(.*)",
+                line
+            )
+
+            if not m:
+                continue
+
+            product = m.group(1).strip()
+
+            qty_text = m.group(2)
+
+            remain = m.group(3).strip()
+
+            qty = 0
+
+            if qty_text == "全出":
+                qty = "全出"
+            else:
+                qty = float(qty_text)
+
+            unit = ""
+
+            price = ""
+
+            note = ""
+
+            for p in remain.split():
+
+                if p.startswith("@"):
+                    price = p[1:]
+                else:
+                    note += p + " "
+
+            orders.append({
+                "date": "預計",
+                "customer": customer,
+                "product": product,
+                "qty": qty,
+                "unit": unit,
+                "price": price,
+                "delivery": "",
+                "note": note.strip()
+            })
+
+        if orders:
+            return orders
+
     for i, line in enumerate(lines):
 
         # ===== 日期 =====
