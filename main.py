@@ -1770,8 +1770,7 @@ def is_header_line(line):
 
 def parse_order_line(line):
     
-    if len(parts) < 3:
-        return None
+    
 
     line = line.strip()
 
@@ -1779,6 +1778,8 @@ def parse_order_line(line):
         line = line[2:].strip()
 
     parts = line.split()
+    if len(parts) < 3:
+        return None
     # ===== 日期、客戶解析（支援多日期）=====
     dates = []
     i = 0
