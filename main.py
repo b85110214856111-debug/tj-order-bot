@@ -3073,6 +3073,13 @@ async def callback(request: Request):
 
         results = []
 
+        # 預計訂單：把 cmd 也去掉「預計」
+        if is_pending:
+            commands = [
+                c[2:].strip() if c.startswith("預計") else c
+                for c in commands
+            ]
+
         for cmd in commands:
             if cmd.startswith("追加"):
                 cmd = cmd[2:].strip()
