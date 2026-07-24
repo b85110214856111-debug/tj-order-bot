@@ -2486,6 +2486,14 @@ def delete_order(text, user_id, rows):
             .replace("—", "-")   # em dash
             .replace("～", "~")   # 全形 ~
     )
+
+    # ===== 多行格式 =====
+    lines = [
+        l.strip()
+        for l in text.splitlines()
+        if l.strip()
+    ]
+
     parts = text.split()
     if len(parts) < 2:
         return "❌ 刪單格式錯誤"
@@ -2587,12 +2595,44 @@ def delete_order(text, user_id, rows):
 
         return f"✅ 已刪 {deleted} 筆" if deleted else "❌ 找不到訂單"
 
-    dates = [x for x in parts[1:] if re.match(r"\d{1,2}/\d{1,2}", x)]
+    # ===== 多行刪單 =====
+    if len(lines) > 1:
 
-    others = [x for x in parts[1:] if not re.match(r"\d{1,2}/\d{1,2}", x)]
+        head = lines[0].split()
 
-    customer = others[0] if len(others) >= 1 else ""
-    product = others[1] if len(others) >= 2 else ""
+        if head[0] == "刪單":
+            head = head[1:]
+
+        dates = []
+        others = []
+
+        for x in head:
+            if re.match(r"\d{1,2}/\d{1,2}", x):
+                dates.append(x)
+            else:
+                others.append(x)
+
+        customer = others[0] if others else ""
+
+        # 第二行開始都是商品
+        products = lines[1:]
+
+    else:
+
+        dates = [
+            x for x in parts[1:]
+            if re.match(r"\d{1,2}/\d{1,2}", x)
+        ]
+
+        others = [
+            x for x in parts[1:]
+            if not re.match(r"\d{1,2}/\d{1,2}", x)
+        ]
+
+        customer = others[0] if len(others) >= 1 else ""
+        product = others[1] if len(others) >= 2 else ""
+
+        products = [product] if product else []
 
 # 不允許只輸入客戶
     if not dates:
@@ -2648,8 +2688,9 @@ def delete_order(text, user_id, rows):
         if customer and r[3] != customer:
             continue
 
-        if product and r[4] != product:
-            continue
+        if products:
+            if r[4] not in products:
+                continue
 
         sheet.update(
             f"L{i}:O{i}",
