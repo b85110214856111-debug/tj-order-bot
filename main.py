@@ -2542,7 +2542,7 @@ def delete_order(text, user_id, rows):
                     "已刪除",
                     now_tw().strftime("%Y-%m-%d %H:%M:%S"),
                     user_id,
-                    elete_batch
+                    delete_batch
                 ]]
             )
 
@@ -2617,8 +2617,6 @@ def delete_order(text, user_id, rows):
 
 # 日期 + 客戶
 
-    target_date = dates[0]
-
     for i in range(len(rows), 1, -1):
 
         r = rows[i - 1]
@@ -2629,7 +2627,7 @@ def delete_order(text, user_id, rows):
             continue
 
         try:
-            if parse_date(r[2]) != parse_date(target_date):
+            if not any(parse_date(r[2]) == parse_date(d) for d in dates):
                 continue
         except:
             continue
