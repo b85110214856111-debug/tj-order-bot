@@ -1274,6 +1274,325 @@ UNIT_WHITELIST = [
     "K","k"
 ]
 
+def schedule_order(text, rows, user_id):
+
+    text = normalize_symbols(text)
+
+    lines = [
+        x.strip()
+        for x in text.splitlines()
+        if x.strip()
+    ]
+
+    if len(lines) < 3:
+        return "❌ 排單格式錯誤"
+
+    # ===== 第一行 =====
+
+    current_customer = ""
+
+    orders = []
+
+    current_date = ""
+
+    delivery = ""
+
+    note = ""
+
+    orders = []
+
+    current_date = ""
+
+    delivery = ""
+
+    note = ""
+
+    # ===== 開始解析 =====
+
+    for line in lines[1:]:
+
+        # ===== 客戶 =====
+
+        if (
+            not re.match(f"^{DATE_PATTERN}$", line)
+            and line not in DELIVERY_LIST
+            and " " not in line
+            and not line.startswith("!")
+        ):
+
+            current_customer = line
+            current_date = ""
+            continue
+
+        # 日期
+        if re.match(f"^{DATE_PATTERN}$", line):
+
+            current_date = format_date(
+                parse_date(line)
+            )
+
+            continue
+
+        # 配送
+        if line in DELIVERY_LIST:
+
+            delivery = line
+
+            continue
+
+        # 備註
+        if line.startswith("!"):
+
+            note = line[1:].strip()
+
+            continue
+
+        if current_date == "":
+            continue
+
+        parts = line.split()
+
+        if not parts:
+            continue
+
+        product = parts[0]
+
+        qty = 0
+
+        unit = ""
+
+        price = ""
+
+        remain = []
+
+        for p in parts[1:]:
+
+            # ===== 數量 =====
+
+            m = re.match(
+                r"(\d+(?:\.\d+)?)(.*)",
+                p
+            )
+
+            if m and qty == 0:
+
+                qty = float(m.group(1))
+
+                unit = parse_unit(
+                    m.group(2)
+                )
+
+                continue
+
+            # ===== 單價 =====
+
+            if p.startswith("@"):
+
+                t = p[1:]
+
+                if t in ("前價", "訂"):
+
+                    price = "前價"
+
+                else:
+
+                    try:
+
+                        v = float(t)
+
+                        if v.is_integer():
+
+                            price = str(int(v))
+
+                        else:
+
+                            price = str(v)
+
+                    except:
+
+                        price = t
+
+                continue
+
+            remain.append(p)
+
+        if remain:
+
+            if note:
+
+                note += " "
+
+            note += " ".join(remain)
+
+        orders.append({
+
+            "date": current_date,
+
+            "customer": current_customer,
+
+            "product": product,
+
+            "qty": qty,
+
+            "unit": unit,
+
+            "price": price,
+
+            "delivery": delivery,
+
+            "note": note
+
+        })
+
+    if not orders:
+        return "❌ 沒有排單資料"
+
+    new_orders = []
+
+    reservation_updates = []
+
+    for order in orders:
+
+        found = False
+
+        for row_no, r in enumerate(rows[1:], start=2):
+
+            status = r[11] if len(r) > 11 else ""
+
+            if status != "預約":
+                continue
+
+            if str(r[2]).strip() != "未定":
+                continue
+
+            if str(r[3]).strip() != order["customer"]:
+                continue
+
+            if str(r[4]).strip() != order["product"]:
+                continue
+
+            reserve_qty = float(r[5])
+
+            schedule_qty = float(order["qty"])
+
+            if schedule_qty > reserve_qty:
+
+                return (
+                    f"❌ {order['product']} "
+                    f"排單數量({schedule_qty}) "
+                    f"大於預約數量({reserve_qty})"
+                )
+
+            # =========================
+            # 單價
+            # =========================
+
+            reserve_price = r[7]
+
+            if order["price"] not in ("", None):
+                price = order["price"]
+            else:
+                price = reserve_price
+
+            new_orders.append({
+
+                "date": order["date"],
+
+                "customer": order["customer"],
+
+                "product": order["product"],
+
+                "qty": schedule_qty,
+
+                "unit": order["unit"],
+
+                "price": price,
+
+                "delivery": order["delivery"] or r[8],
+
+                "note": order["note"] or r[9]
+
+            })
+
+            remain = reserve_qty - schedule_qty
+
+            reservation_updates.append({
+
+                "row": row_no,
+
+                "remain": remain
+
+            })
+
+            found = True
+
+            break
+
+        if not found:
+
+            return (
+                f"❌ 找不到預約："
+                f"{order['customer']} "
+                f"{order['product']}"
+            )
+
+        # =========================
+        # 建立正式訂單
+        # =========================
+
+        save_orders_batch(
+            new_orders,
+            user_id
+        )
+
+        # =========================
+        # 更新預約
+        # =========================
+
+        batch_updates = []
+
+        for item in reservation_updates:
+
+            row = item["row"]
+
+            remain = item["remain"]
+
+            # 數量歸零
+            if remain <= 0:
+
+                batch_updates.append({
+
+                    "range": f"F{row}:L{row}",
+
+                    "values": [[
+                        0,
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "已完成"
+                    ]]
+
+                })
+
+            # 還有剩餘
+            else:
+
+                batch_updates.append({
+
+                    "range": f"F{row}",
+
+                    "values": [[remain]]
+
+                })
+
+        if batch_updates:
+
+            sheet.batch_update(batch_updates)
+
+        return f"✅ 已排 {len(new_orders)} 筆"
+
 def edit_order(text, rows):
     text = expand_short_dates(text)
     
@@ -1669,12 +1988,12 @@ def save_order(data, user_id):
         data["delivery"],
         data["note"],
         user_id,
-        "正常",
+        data.get("status", "正常"),
         "",
         "",
         "",
-        str(uuid.uuid4()),  # P
-        seq_no              # Q
+        str(uuid.uuid4()),
+        seq_no
     ])
 
     return oid
@@ -1716,12 +2035,12 @@ def save_orders_batch(
             order["delivery"],
             order["note"],
             user_id,
-            "正常",
+            order.get("status", "正常"),
             "",
             "",
             "",
-            str(uuid.uuid4()),  # P
-            seq_no              # Q
+            str(uuid.uuid4()),
+            seq_no
         ])
 
     sheet.append_rows(rows)
@@ -2259,6 +2578,134 @@ def parse_customer_products(text):
             customer = line
             product = ""
     
+    return orders
+
+def parse_reservation(text):
+
+    text = text.strip()
+
+    if text.startswith("預約"):
+        text = text[2:].strip()
+
+    lines = [
+        x.strip()
+        for x in text.splitlines()
+        if x.strip()
+    ]
+
+    if len(lines) < 2:
+        return []
+
+    rows = customer_sheet.get_all_values()
+
+    customer = lines[0]
+
+    delivery = ""
+    note = ""
+
+    orders = []
+
+    for line in lines[1:]:
+
+        # ===== 配送 =====
+        if line in DELIVERY_LIST:
+            delivery = line
+            continue
+
+        # ===== 備註 =====
+        if line.startswith("!"):
+            note = line[1:].strip()
+            continue
+
+        parts = line.split()
+
+        if not parts:
+            continue
+
+        product = parts[0]
+
+        qty = 0
+        unit = ""
+        price = ""
+
+        # 預設價格
+        for r in rows[1:]:
+            if r[0] == customer and r[1] == product:
+                price = r[3]
+                break
+
+        remain = []
+
+        for p in parts[1:]:
+
+            # ===== 數量 =====
+            m = re.match(r"(\d+(?:\.\d+)?)(.*)", p)
+
+            if m and qty == 0:
+
+                qty = float(m.group(1))
+                unit = parse_unit(m.group(2))
+                continue
+
+            # ===== 單價 =====
+            if p.startswith("@"):
+
+                price_text = p[1:]
+
+                if price_text in ("前價", "訂"):
+                    price = "前價"
+
+                else:
+                    try:
+                        v = float(price_text)
+
+                        if v.is_integer():
+                            price = str(int(v))
+                        else:
+                            price = str(v)
+
+                    except:
+                        price = price_text
+
+                continue
+
+            # ===== 配送 =====
+            if p in DELIVERY_LIST:
+
+                delivery = p
+                continue
+
+            remain.append(p)
+
+        if remain:
+
+            if note:
+                note += " "
+
+            note += " ".join(remain)
+
+        orders.append({
+
+            "date": "未定",
+
+            "customer": customer,
+
+            "product": product,
+
+            "qty": qty,
+
+            "unit": unit,
+
+            "price": price,
+
+            "delivery": delivery,
+
+            "note": note,
+
+            "status": "預約"
+
+        })
+
     return orders
 
 def parse_customer_date_blocks(text):
@@ -3122,7 +3569,13 @@ async def callback(request: Request):
             continue
 
         # 改單 / 排程類：不要拆 block
-        if text.startswith(("改單", "刪單", "復原")):
+        if text.startswith((
+            "改單",
+            "刪單",
+            "復原",
+            "預約",
+            "排單"
+        )):
             commands = [text]
 
         elif (
@@ -3206,6 +3659,36 @@ async def callback(request: Request):
                         user_name,
                         rows
                     )   
+                )
+
+            elif cmd.startswith("預約"):
+
+                orders = parse_reservation(cmd)
+
+                if not orders:
+
+                    results.append("❌ 預約格式錯誤")
+
+                else:
+
+                    count = save_reservation_batch(
+                        orders,
+                        user_name
+                    )
+
+                    results.append(
+                        f"✅ 已新增 {count} 筆預約"
+                    )
+
+
+            elif cmd.startswith("排單"):
+
+                results.append(
+                    schedule_order(
+                        cmd,
+                        rows,
+                        user_name
+                    )
                 )
 
             elif cmd.startswith("改單"):
