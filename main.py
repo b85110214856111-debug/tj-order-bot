@@ -1384,7 +1384,13 @@ def edit_order(text, rows):
 
                     # 允許 @80、@80.5
                     elif re.fullmatch(r"\d+(?:\.\d+)?", price_text):
-                        updates["單價"] = str(float(price_text))
+
+                        price = float(price_text)
+
+                        if price.is_integer():
+                            updates["單價"] = str(int(price))
+                        else:
+                            updates["單價"] = str(price)
 
                     # 其它 (@、@成員...) 一律忽略
                     else:
