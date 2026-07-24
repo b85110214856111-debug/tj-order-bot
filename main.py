@@ -442,8 +442,14 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
         try:
             d = parse_date(r[2])
         except:
+            # 待排放最後
             d = datetime.max
-        return (d, r[3], r[4])
+
+        return (
+            d,
+            r[3],
+            r[4]
+        )
 
     export_rows.sort(key=sort_key)
 
