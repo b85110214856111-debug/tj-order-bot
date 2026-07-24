@@ -1525,6 +1525,9 @@ def schedule_order(text, rows, user_id):
 
             remain = reserve_qty - schedule_qty
 
+            # 更新記憶體中的剩餘數量
+            r[5] = str(remain)
+
             reservation_updates.append({
 
                 "row": row_no,
