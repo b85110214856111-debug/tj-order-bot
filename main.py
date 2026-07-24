@@ -382,10 +382,10 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
 
     for r in rows[1:]:
 
-        # 排除已刪除、預約
+        # 排除已刪除
         status = r[11] if len(r) > 11 else ""
 
-        if status in ("已刪除", "預約"):
+        if status == "已刪除":
             continue
 
         # 日期區間（支援跨年）
