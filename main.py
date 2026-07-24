@@ -1275,7 +1275,7 @@ UNIT_WHITELIST = [
 ]
 
 def edit_order(text, rows):
-
+    text = expand_short_dates(text)
     
     text = text.strip()
     text = normalize_symbols(text)
@@ -2395,7 +2395,7 @@ def parse_customer_date_blocks(text):
     return orders
 
 def query_order(text, rows):
-
+    text = expand_short_dates(text)
     keyword = text.replace("查詢", "").strip()
 
     # 保留原本單一查詢
@@ -2470,6 +2470,9 @@ def query_order(text, rows):
     return "\n".join(lines)
 
 def delete_order(text, user_id, rows):
+    # 展開日期
+    text = expand_short_dates(text)
+
     # 統一日期區間符號
     text = (
         text.replace("－", "-")   # 全形 -
@@ -2655,6 +2658,7 @@ def delete_order(text, user_id, rows):
     return f"✅ 已刪 {deleted} 筆" if deleted else "❌ 找不到訂單"
 
 def restore_order(text, rows):
+    text = expand_short_dates(text)
     if text.strip() in ["復原最後刪除", "還原最後刪除"]:
         return restore_last_delete()
     parts = text.split()
