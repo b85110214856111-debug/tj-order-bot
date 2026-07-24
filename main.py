@@ -1310,52 +1310,58 @@ def schedule_order(text, rows, user_id):
             current_date = ""
             continue
 
-        # 日期
-        if re.match(f"^{DATE_PATTERN}$", line):
-            current_date = format_date(parse_date(line))
-            continue
+        # ===== 日期 =====
+        if re.fullmatch(f"{DATE_PATTERN}", line):
 
-        # 沒日期時就是客戶
-        if current_date == "":
-            current_customer = line
+            current_date = format_date(
+                parse_date(line)
+            )
+
             delivery = ""
             note = ""
+
             continue
 
-        # 已有日期，但又遇到不像商品的文字
-        # 視為新的客戶
-        if (
-            current_date != ""
-            and " " not in line
-            and line not in DELIVERY_LIST
-            and not line.startswith("!")
-        ):
-            current_customer = line
-            current_date = ""
-            delivery = ""
-            note = ""
-            continue
 
-        # 配送
+        # ===== 配送 =====
         if line in DELIVERY_LIST:
 
             delivery = line
 
             continue
 
-        # 備註
+
+        # ===== 備註 =====
         if line.startswith("!"):
 
             note = line[1:].strip()
 
             continue
 
-        if current_date == "":
-            continue
 
         parts = line.split()
 
         if not parts:
+            continue
+
+
+        # ===== 商品 =====
+        # 第二個欄位像 5kg、2顆、3包...
+        if (
+            current_date
+            and len(parts) >= 2
+            and re.match(r"\d+(?:\.\d+)?", parts[1])
+        ):
+            pass
+
+        # ===== 不是商品，就是新的客戶 =====
+        else:
+
+            current_customer = line
+            current_date = ""
+            delivery = ""
+            note = ""
+
             continue
 
         product = parts[0]
