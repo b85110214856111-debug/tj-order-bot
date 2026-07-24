@@ -1279,9 +1279,8 @@ def schedule_order(text, rows, user_id):
     text = normalize_symbols(text)
 
     lines = [
-        x.strip()
+        x.rstrip()
         for x in text.splitlines()
-        if x.strip()
     ]
 
     if len(lines) < 3:
@@ -1299,13 +1298,6 @@ def schedule_order(text, rows, user_id):
 
     note = ""
 
-    orders = []
-
-    current_date = ""
-
-    delivery = ""
-
-    note = ""
 
     # ===== 開始解析 =====
 
@@ -1313,24 +1305,35 @@ def schedule_order(text, rows, user_id):
 
         # ===== 客戶 =====
 
-        if (
-            not re.match(f"^{DATE_PATTERN}$", line)
-            and line not in DELIVERY_LIST
-            and " " not in line
-            and not line.startswith("!")
-        ):
-
-            current_customer = line
+        # 空白行
+        if line == "":
             current_date = ""
             continue
 
         # 日期
         if re.match(f"^{DATE_PATTERN}$", line):
+            current_date = format_date(parse_date(line))
+            continue
 
-            current_date = format_date(
-                parse_date(line)
-            )
+        # 沒日期時就是客戶
+        if current_date == "":
+            current_customer = line
+            delivery = ""
+            note = ""
+            continue
 
+        # 已有日期，但又遇到不像商品的文字
+        # 視為新的客戶
+        if (
+            current_date != ""
+            and " " not in line
+            and line not in DELIVERY_LIST
+            and not line.startswith("!")
+        ):
+            current_customer = line
+            current_date = ""
+            delivery = ""
+            note = ""
             continue
 
         # 配送
@@ -1536,62 +1539,63 @@ def schedule_order(text, rows, user_id):
                 f"{order['product']}"
             )
 
+    save_orders_batch(
+        new_orders,
+        user_id
+    )
+    
+            # =========================
+            # 更新預約
+            # =========================
+    
+    batch_updates = []
+    
+    for item in reservation_updates:
+    
+        row = item["row"]
+    
+        remain = item["remain"]
+    
+                # 數量歸零
+        if remain <= 0:
+    
+            batch_updates.append({
+    
+                "range": f"F{row}:L{row}",
+    
+                "values": [[
+                    0,
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "已完成"
+                ]]
+    
+            })
+    
+        # 還有剩餘
+        else:
+    
+            batch_updates.append({
+    
+                "range": f"F{row}",
+    
+                "values": [[remain]]
+    
+            })
+    
+    if batch_updates:
+    
+        sheet.batch_update(batch_updates)
+    
+    return f"✅ 已排 {len(new_orders)} 筆"
         # =========================
         # 建立正式訂單
         # =========================
 
-        save_orders_batch(
-            new_orders,
-            user_id
-        )
-
-        # =========================
-        # 更新預約
-        # =========================
-
-        batch_updates = []
-
-        for item in reservation_updates:
-
-            row = item["row"]
-
-            remain = item["remain"]
-
-            # 數量歸零
-            if remain <= 0:
-
-                batch_updates.append({
-
-                    "range": f"F{row}:L{row}",
-
-                    "values": [[
-                        0,
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "已完成"
-                    ]]
-
-                })
-
-            # 還有剩餘
-            else:
-
-                batch_updates.append({
-
-                    "range": f"F{row}",
-
-                    "values": [[remain]]
-
-                })
-
-        if batch_updates:
-
-            sheet.batch_update(batch_updates)
-
-        return f"✅ 已排 {len(new_orders)} 筆"
+        
 
 def edit_order(text, rows):
     text = expand_short_dates(text)
