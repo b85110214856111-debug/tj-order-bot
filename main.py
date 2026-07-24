@@ -382,7 +382,6 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
 
     for r in rows[1:]:
 
-        # 排除已刪除
         status = r[11] if len(r) > 11 else ""
 
         if status == "已刪除":
@@ -438,20 +437,13 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
 
         count += 1
 
-    def sort_key(r):
-        try:
-            d = parse_date(r[2])
-        except:
-            # 待排放最後
-            d = datetime.max
-
-        return (
-            d,
+    export_rows.sort(
+        key=lambda r: (
+            parse_date(r[2]),
             r[3],
             r[4]
         )
-
-    export_rows.sort(key=sort_key)
+    )
 
     for r in export_rows:
 
@@ -1450,15 +1442,13 @@ def edit_order(text, rows):
         for row_no, r in enumerate(rows[1:], start=2):
 
             sheet_date = str(r[2]).strip()
+            try:
 
-            # 預約單沒有日期
-            if sheet_date == "待排":
-                sheet_date_obj = None
-            else:
-                try:
-                    sheet_date_obj = parse_date(sheet_date)
-                except:
-                    continue
+                sheet_date_obj = parse_date(sheet_date)
+
+            except:
+
+                continue
             sheet_customer = str(r[3]).strip()
             sheet_product = str(r[4]).strip()
 
@@ -1485,28 +1475,28 @@ def edit_order(text, rows):
             # 日期條件
             if dates:
 
-                # 預約單(待排)不比對日期
-                if sheet_date_obj is not None:
+                target = False
 
-                    target = False
+                for d in dates:
 
-                    for d in dates:
+                    try:
 
-                        try:
+                        if sheet_date_obj == parse_date(
+                            d,
+                            sheet_date_obj
+                        ):
 
-                            if sheet_date_obj == parse_date(
-                                d,
-                                sheet_date_obj
-                            ):
+                            target = True
 
-                                target = True
-                                break
+                            break
 
-                        except:
-                            pass
+                    except:
 
-                    if not target:
-                        continue
+                        pass
+
+                if not target:
+
+                    continue
 
             # 客戶條件
             if customer and customer not in sheet_customer:
@@ -1526,13 +1516,6 @@ def edit_order(text, rows):
                     "range": f"C{row_no}",
                     "values": [[updates["日期"]]]
                 })
-
-                # 如果原本是預約單，改日期後自動轉正式單
-                if str(r[11]).strip() == "預約":
-                    batch_updates.append({
-                        "range": f"L{row_no}",
-                        "values": [["正常"]]
-                    })
 
             if "商品" in updates:
                 batch_updates.append({
@@ -1690,40 +1673,9 @@ def save_order(data, user_id):
 
     return oid
 
-def create_reserve_order(cmd, user_name):
-
-    # 移除「預約」
-    text = cmd.replace("預約", "", 1).strip()
-
-    data = parse_order_line(f"12/31 {text}")
-
-    if not data:
-        return "❌ 預約格式錯誤"
-
-    if isinstance(data, list):
-        orders = data
-    else:
-        orders = [data]
-
-    # 日期改成待排
-    for o in orders:
-        o["date"] = "待排"
-
-    count = save_orders_batch(
-        orders,
-        user_name,
-        status="預約"
-    )
-
-    if count:
-        return f"✅ 已建 {count} 筆預約單"
-
-    return "❌ 建立失敗"
-
 def save_orders_batch(
     orders,
-    user_name,
-    status="正常"
+    user_id
 ):
 
     rows = []
@@ -1757,8 +1709,8 @@ def save_orders_batch(
             order["price"],
             order["delivery"],
             order["note"],
-            user_name,
-            status,
+            user_id,
+            "正常",
             "",
             "",
             "",
@@ -2448,28 +2400,16 @@ def query_order(text, rows):
 
     for r in rows[1:]:
 
+        # 跳過已刪除訂單
         status = r[11] if len(r) > 11 else ""
 
-        # 查詢 預約
-        if keyword == "預約":
-
-            if status != "預約":
-                continue
-
-        # 一般查詢
-        else:
-
-            if status in ("已刪除", "預約"):
-                continue
+        if status == "已刪除":
+            continue
 
         matched = False
 
-        # 查詢全部預約
-        if keyword == "預約":
-            matched = True
-
-        # 一般文字搜尋
-        elif keyword in " ".join(r):
+# 一般文字搜尋
+        if keyword in " ".join(r):
             matched = True
 
 # 日期搜尋（支援 MM/DD、YYYY/MM/DD）
@@ -3198,15 +3138,6 @@ async def callback(request: Request):
 
                 results.append(
                     customer_query(cmd)
-                )
-
-            elif cmd.startswith("預約"):
-
-                results.append(
-                    create_reserve_order(
-                        cmd,
-                        user_name
-                    )
                 )
 
             elif cmd.startswith("復原"):
