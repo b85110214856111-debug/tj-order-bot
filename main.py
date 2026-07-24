@@ -2641,6 +2641,10 @@ def parse_reservation(text):
         unit = ""
         price = ""
 
+        # 每個商品重新開始
+        item_delivery = delivery
+        item_note = note
+
         # 預設價格
         for r in rows[1:]:
             if r[0] == customer and r[1] == product:
@@ -2685,17 +2689,17 @@ def parse_reservation(text):
             # ===== 配送 =====
             if p in DELIVERY_LIST:
 
-                delivery = p
+                item_delivery = p
                 continue
 
             remain.append(p)
 
         if remain:
 
-            if note:
-                note += " "
+            if item_note:
+                item_note += " "
 
-            note += " ".join(remain)
+            item_note += " ".join(remain)
 
         orders.append({
 
@@ -2711,9 +2715,9 @@ def parse_reservation(text):
 
             "price": price,
 
-            "delivery": delivery,
+            "delivery": item_delivery,
 
-            "note": note,
+            "note": item_note,
 
             "status": "預約"
 
