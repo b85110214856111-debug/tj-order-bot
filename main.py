@@ -1705,7 +1705,8 @@ def create_reserve_order(cmd, user_name):
 
 def save_orders_batch(
     orders,
-    user_id
+    user_name,
+    status="正常"
 ):
 
     rows = []
@@ -1739,8 +1740,8 @@ def save_orders_batch(
             order["price"],
             order["delivery"],
             order["note"],
-            user_id,
-            "正常",
+            user_name,
+            status,
             "",
             "",
             "",
