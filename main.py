@@ -2510,6 +2510,8 @@ def delete_order(text, user_id, rows):
         customer = args[0] if len(args) >= 1 else ""
         product = args[1] if len(args) >= 2 else ""
 
+        # 日期 + 客戶 (+ 商品)
+
         for i in range(len(rows), 1, -1):
 
             r = rows[i - 1]
@@ -2520,10 +2522,9 @@ def delete_order(text, user_id, rows):
                 continue
 
             try:
-                if not in_date_range(
-                    r[2],
-                    start_date,
-                    end_date
+                if not any(
+                    parse_date(r[2]) == parse_date(d)
+                    for d in dates
                 ):
                     continue
             except:
@@ -2541,17 +2542,13 @@ def delete_order(text, user_id, rows):
                     "已刪除",
                     now_tw().strftime("%Y-%m-%d %H:%M:%S"),
                     user_id,
-                    delete_batch
+                    elete_batch
                 ]]
             )
 
             deleted += 1
 
-        return (
-            f"✅ 已刪 {deleted} 筆"
-            if deleted
-            else "❌ 找不到訂單"
-        )
+        return f"✅ 已刪 {deleted} 筆" if deleted else "❌ 找不到訂單"
 
     if parts[1].isdigit():
         for i in range(len(rows),1,-1):
