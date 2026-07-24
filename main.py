@@ -2395,7 +2395,12 @@ def parse_customer_date_blocks(text):
     return orders
 
 def query_order(text, rows):
+
     keyword = text.replace("查詢", "").strip()
+
+    # 保留原本單一查詢
+    keywords = keyword.split()
+
     result = []
 
     for r in rows[1:]:
@@ -2406,19 +2411,41 @@ def query_order(text, rows):
         if status == "已刪除":
             continue
 
-        matched = False
+        row_text = " ".join(r)
 
-# 一般文字搜尋
-        if keyword in " ".join(r):
+        # ===== 原本功能：只有一個關鍵字 =====
+        if len(keywords) == 1:
+
+            matched = False
+
+            if keyword in row_text:
+                matched = True
+
+            else:
+                try:
+                    if parse_date(keyword) == parse_date(r[2]):
+                        matched = True
+                except:
+                    pass
+
+        # ===== 新增功能：多關鍵字 =====
+        else:
+
             matched = True
 
-# 日期搜尋（支援 MM/DD、YYYY/MM/DD）
-        else:
-            try:
-                if parse_date(keyword) == parse_date(r[2]):
-                    matched = True
-            except:
-                pass
+            for kw in keywords:
+
+                # 日期
+                try:
+                    if parse_date(kw) == parse_date(r[2]):
+                        continue
+                except:
+                    pass
+
+                # 文字
+                if kw not in row_text:
+                    matched = False
+                    break
 
         if matched:
             result.append(r)
@@ -2427,13 +2454,19 @@ def query_order(text, rows):
         return "❌ 找不到訂單"
 
     lines = []
+
     for r in result[:50]:
         qty = r[5] if len(r) > 5 else ""
         unit = r[6] if len(r) > 6 else "件"
         price = r[7] if len(r) > 7 else ""
         delivery = r[8] if len(r) > 8 else ""
         note = r[9] if len(r) > 9 else ""
-        lines.append(f"單號:{r[0]} 日期:{r[2]} 客戶:{r[3]} 商品:{r[4]} 數量:{qty}{unit} 單價:{price} 配送:{delivery} 備註:{note}")
+
+        lines.append(
+            f"單號:{r[0]} 日期:{r[2]} 客戶:{r[3]} 商品:{r[4]} "
+            f"數量:{qty}{unit} 單價:{price} 配送:{delivery} 備註:{note}"
+        )
+
     return "\n".join(lines)
 
 def delete_order(text, user_id, rows):
