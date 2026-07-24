@@ -2556,8 +2556,13 @@ def delete_order(text, user_id, rows):
 
         return f"✅ 已刪 {deleted} 筆" if deleted else "❌ 找不到訂單"
 
-    if parts[1].isdigit():
-        for i in range(len(rows),1,-1):
+    # ===== 單號刪除（支援多個單號）=====
+    order_ids = [x for x in parts[1:] if x.isdigit()]
+
+    if order_ids:
+
+        for i in range(len(rows), 1, -1):
+
             r = rows[i - 1]
 
             status = r[11] if len(r) > 11 else ""
@@ -2565,19 +2570,21 @@ def delete_order(text, user_id, rows):
             if status == "已刪除":
                 continue
 
-            if r[0] == parts[1]:
+            if r[0] not in order_ids:
+                continue
 
-                sheet.update(
-                    f"L{i}:O{i}",
-                    [[
-                        "已刪除",
-                        now_tw().strftime("%Y-%m-%d %H:%M:%S"),
-                        user_id,
-                        delete_batch
-                    ]]
-                )
+            sheet.update(
+                f"L{i}:O{i}",
+                [[
+                    "已刪除",
+                    now_tw().strftime("%Y-%m-%d %H:%M:%S"),
+                    user_id,
+                    delete_batch
+                ]]
+            )
 
-                deleted += 1
+            deleted += 1
+
         return f"✅ 已刪 {deleted} 筆" if deleted else "❌ 找不到訂單"
 
     dates = [x for x in parts[1:] if re.match(r"\d{1,2}/\d{1,2}", x)]
