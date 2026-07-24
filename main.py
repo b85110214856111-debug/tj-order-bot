@@ -3671,7 +3671,7 @@ async def callback(request: Request):
 
                 else:
 
-                    count = save_reservation_batch(
+                    count = save_orders_batch(
                         orders,
                         user_name
                     )
