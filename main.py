@@ -1673,6 +1673,36 @@ def save_order(data, user_id):
 
     return oid
 
+def create_reserve_order(cmd, user_name):
+
+    # 移除「預約」
+    text = cmd.replace("預約", "", 1).strip()
+
+    data = parse_order_line(f"12/31 {text}")
+
+    if not data:
+        return "❌ 預約格式錯誤"
+
+    if isinstance(data, list):
+        orders = data
+    else:
+        orders = [data]
+
+    # 日期改成待排
+    for o in orders:
+        o["date"] = "待排"
+
+    count = save_orders_batch(
+        orders,
+        user_name,
+        status="預約"
+    )
+
+    if count:
+        return f"✅ 已建立 {count} 筆預約單"
+
+    return "❌ 建立失敗"
+
 def save_orders_batch(
     orders,
     user_id
@@ -3138,6 +3168,15 @@ async def callback(request: Request):
 
                 results.append(
                     customer_query(cmd)
+                )
+
+            elif cmd.startswith("預約"):
+
+                results.append(
+                    create_reserve_order(
+                        cmd,
+                        user_name
+                    )
                 )
 
             elif cmd.startswith("復原"):
