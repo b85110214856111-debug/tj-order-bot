@@ -3160,7 +3160,7 @@ def delete_order(text, user_id, rows):
     deleted = 0
 
     delete_batch = now_tw().strftime("%Y%m%d%H%M%S")
-
+    deleted_rows = []
         # ===== 日期區間刪除 =====
     m = re.search(
         rf"({DATE_PATTERN})\s*[~-]\s*({DATE_PATTERN})",
@@ -3209,7 +3209,7 @@ def delete_order(text, user_id, rows):
             if product and r[4] != product:
                 continue
 
-            restore_reserve(r, rows)
+            deleted_rows.append(r)
             sheet.update(
                 f"L{i}:O{i}",
                 [[
@@ -3221,7 +3221,8 @@ def delete_order(text, user_id, rows):
             )
 
             deleted += 1
-
+        if deleted_rows:
+            restore_reserve_batch(deleted_rows, rows)
         return f"✅ 已刪 {deleted} 筆" if deleted else "❌ 找不到訂單"
 
     # ===== 單號刪除（支援多個單號）=====
@@ -3241,7 +3242,7 @@ def delete_order(text, user_id, rows):
             if r[0] not in order_ids:
                 continue
 
-            restore_reserve(r, rows)
+            deleted_rows.append(r)
             sheet.update(
                 f"L{i}:O{i}",
                 [[
@@ -3253,7 +3254,8 @@ def delete_order(text, user_id, rows):
             )
 
             deleted += 1
-
+        if deleted_rows:
+            restore_reserve_batch(deleted_rows, rows)
         return f"✅ 已刪 {deleted} 筆" if deleted else "❌ 找不到訂單"
 
     # ===== 多行刪單 =====
@@ -3314,7 +3316,7 @@ def delete_order(text, user_id, rows):
             try:
                 if any(parse_date(r[2]) == parse_date(d) for d in dates):
 
-                    restore_reserve(r, rows)
+                    deleted_rows.append(r)
                     sheet.update(
                         f"L{i}:O{i}",
                         [[
@@ -3328,6 +3330,9 @@ def delete_order(text, user_id, rows):
                     deleted += 1
             except:
                 pass
+
+        if deleted_rows:
+            restore_reserve_batch(deleted_rows, rows)
         return f"✅ 已刪 {deleted} 筆" if deleted else "❌ 找不到訂單"
 
 # 日期 + 客戶
@@ -3354,7 +3359,7 @@ def delete_order(text, user_id, rows):
             if r[4] not in products:
                 continue
 
-        restore_reserve(r, rows)
+        deleted_rows.append(r)
         sheet.update(
             f"L{i}:O{i}",
             [[
@@ -3366,39 +3371,68 @@ def delete_order(text, user_id, rows):
         )
 
         deleted += 1
-
+    if deleted_rows:
+        restore_reserve_batch(deleted_rows, rows)
     return f"✅ 已刪 {deleted} 筆" if deleted else "❌ 找不到訂單"
 
-def restore_reserve(row, rows, user_id=None):
-    """正式單刪除/改單時，回填來源預約"""
 
-    reserve_uuid = str(row[17]).strip() if len(row) > 17 else ""
 
-    if not reserve_uuid:
-        return
+def restore_reserve_batch(delete_rows, rows):
 
-    reserve_row_no, reserve_row = find_reserve_row(rows, reserve_uuid)
+    reserve_map = {}
 
-    if not reserve_row:
-        return
+    for r in delete_rows:
 
-    order_qty = float(row[5]) if str(row[5]).strip() else 0
-    reserve_qty = float(reserve_row[5]) if str(reserve_row[5]).strip() else 0
+        if len(r) < 18:
+            continue
 
-    reserve_qty += order_qty
+        reserve_uuid = str(r[17]).strip()
 
-    batch = [
-        {
+        if not reserve_uuid:
+            continue
+
+        qty = float(r[5]) if str(r[5]).strip() else 0
+
+        reserve_map[reserve_uuid] = (
+            reserve_map.get(reserve_uuid, 0) + qty
+        )
+
+    batch_updates = []
+
+    for reserve_uuid, add_qty in reserve_map.items():
+
+        reserve_row_no, reserve_row = find_reserve_row(
+            rows,
+            reserve_uuid
+        )
+
+        if reserve_row is None:
+            continue
+
+        reserve_qty = (
+            float(reserve_row[5])
+            if str(reserve_row[5]).strip()
+            else 0
+        )
+
+        reserve_qty += add_qty
+
+        # 更新記憶體
+        reserve_row[5] = str(reserve_qty)
+        reserve_row[11] = "預約"
+
+        batch_updates.append({
             "range": f"F{reserve_row_no}",
             "values": [[reserve_qty]]
-        },
-        {
+        })
+
+        batch_updates.append({
             "range": f"L{reserve_row_no}",
             "values": [["預約"]]
-        }
-    ]
+        })
 
-    sheet.batch_update(batch)
+    if batch_updates:
+        sheet.batch_update(batch_updates)
 
 def restore_order(text, rows):
     text = expand_short_dates(text)
