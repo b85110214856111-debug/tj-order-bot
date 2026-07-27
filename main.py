@@ -1518,17 +1518,27 @@ def schedule_order(text, rows, user_id):
             if str(r[4]).strip() != order["product"]:
                 continue
 
-            reserve_qty = float(r[5])
+            need_qty = float(order["qty"])
 
-            schedule_qty = float(order["qty"])
+            for row_no, r in enumerate(rows[1:], start=2):
 
-            if schedule_qty > reserve_qty:
+                status = r[11] if len(r) > 11 else ""
 
-                return (
-                    f"❌ {order['product']} "
-                    f"排單數量({schedule_qty}) "
-                    f"大於預約數量({reserve_qty})"
-                )
+                if status != "預約":
+                    continue
+
+                if str(r[2]).strip() != "未定":
+                    continue
+
+                if str(r[3]).strip() != order["customer"]:
+                    continue
+
+                if str(r[4]).strip() != order["product"]:
+                    continue
+
+                reserve_qty = float(r[5])
+
+                use_qty = min(need_qty, reserve_qty)
 
             # =========================
             # 單價
@@ -1544,24 +1554,16 @@ def schedule_order(text, rows, user_id):
             new_orders.append({
 
                 "date": order["date"],
-
                 "customer": order["customer"],
-
                 "product": order["product"],
-
-                "qty": schedule_qty,
-
+                "qty": use_qty,
                 "unit": order["unit"],
-
                 "price": price,
-
                 "delivery": order["delivery"] or r[8],
-
                 "note": order["note"] or r[9]
-
             })
 
-            remain = reserve_qty - schedule_qty
+            remain = reserve_qty - use_qty
 
             # 更新記憶體中的剩餘數量
             r[5] = str(remain)
@@ -1574,16 +1576,17 @@ def schedule_order(text, rows, user_id):
 
             })
 
+            need_qty -= use_qty
+
             found = True
 
-            break
+            if need_qty <= 0:
+                break
 
-        if not found:
+        if need_qty > 0:
 
             return (
-                f"❌ 找不到預約："
-                f"{order['customer']} "
-                f"{order['product']}"
+                f"❌ {order['product']} 預約不足，還缺 {need_qty}{order['unit']}"
             )
 
     save_orders_batch(
