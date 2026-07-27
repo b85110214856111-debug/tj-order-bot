@@ -371,7 +371,8 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
         "單位",
         "單價",
         "配送",
-        "備註"
+        "備註",
+        "狀態"
     ])
 
     count = 0
@@ -421,6 +422,7 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
         customer = r[3]
         product = r[4]
         unit = r[6]
+        status = r[11]
 
         try:
             qty = float(r[5])
@@ -430,7 +432,8 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
         key = (
             customer,
             product,
-            unit
+            unit,
+            status
         )
 
         summary[key] = summary.get(key, 0) + qty
@@ -457,7 +460,8 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
             r[6],
             r[7],
             r[8],
-            r[9]
+            r[9],
+            r[11]
         ])
 
     if count == 0:
@@ -474,6 +478,7 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
         "客戶",
         "商品",
         "單位",
+        "狀態",
         "數量合計"
     ])
 
@@ -483,6 +488,7 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
             customer,
             product,
             unit,
+            status,
             total_qty
         ])
     excel_buffer = BytesIO()
@@ -548,10 +554,6 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
     url = upload_zip(zip_buffer.getvalue())
 
     return url
-
-
-
-
 
 def get_user_name(user_id):
 
