@@ -1290,6 +1290,8 @@ def schedule_order(text, rows, user_id):
 
     current_customer = ""
 
+    current_product = ""
+
     orders = []
 
     current_date = ""
@@ -1301,7 +1303,7 @@ def schedule_order(text, rows, user_id):
 
     # ===== 開始解析 =====
 
-    for line in lines[1:]:
+    for i, line in enumerate(lines[1:]):
 
         # ===== 客戶 =====
 
@@ -1321,6 +1323,21 @@ def schedule_order(text, rows, user_id):
             note = ""
 
             continue
+
+        # ===== 日期 + 數量（商品固定）=====
+        m = re.match(
+            rf"^({DATE_PATTERN})\s+(.+)$",
+            line
+        )
+
+        if m and current_product:
+
+            current_date = format_date(
+                parse_date(m.group(1))
+            )
+
+            # 組回原本的商品格式
+            line = current_product + " " + m.group(2)
 
 
         # ===== 配送 =====
@@ -1354,10 +1371,24 @@ def schedule_order(text, rows, user_id):
         ):
             pass
 
-        # ===== 不是商品，就是新的客戶 =====
+        # ===== 不是商品 =====
         else:
 
+            # 如果下一行是 日期+數量，代表這行其實是商品
+            if (
+                current_customer
+                and i + 2 < len(lines)
+                and re.match(
+                    rf"^{DATE_PATTERN}\s+",
+                    lines[i + 2]
+                )
+            ):
+                current_product = line
+                continue
+
+            # 否則就是新的客戶
             current_customer = line
+            current_product = ""
             current_date = ""
             delivery = ""
             note = ""
