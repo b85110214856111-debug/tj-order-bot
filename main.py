@@ -484,7 +484,7 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
         "數量合計"
     ])
 
-    for (customer, product, unit), total_qty in sorted(summary.items()):
+    for (customer, product, unit, status), total_qty in sorted(summary.items()):
 
         ws.append([
             customer,
