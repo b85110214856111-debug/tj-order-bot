@@ -3434,17 +3434,79 @@ def restore_reserve_batch(delete_rows, rows):
     if batch_updates:
         sheet.batch_update(batch_updates)
 
+def deduct_reserve_batch(restore_rows, rows):
+
+    reserve_map = {}
+
+    for r in restore_rows:
+
+        if len(r) < 18:
+            continue
+
+        reserve_uuid = str(r[17]).strip()
+
+        if not reserve_uuid:
+            continue
+
+        qty = float(r[5]) if str(r[5]).strip() else 0
+
+        reserve_map[reserve_uuid] = (
+            reserve_map.get(reserve_uuid, 0) + qty
+        )
+
+    batch_updates = []
+
+    for reserve_uuid, deduct_qty in reserve_map.items():
+
+        reserve_row_no, reserve_row = find_reserve_row(
+            rows,
+            reserve_uuid
+        )
+
+        if reserve_row is None:
+            continue
+
+        reserve_qty = (
+            float(reserve_row[5])
+            if str(reserve_row[5]).strip()
+            else 0
+        )
+
+        reserve_qty -= deduct_qty
+
+        if reserve_qty <= 0:
+            reserve_qty = 0
+            status = "已完成"
+        else:
+            status = "預約"
+
+        reserve_row[5] = str(reserve_qty)
+        reserve_row[11] = status
+
+        batch_updates.append({
+            "range": f"F{reserve_row_no}",
+            "values": [[reserve_qty]]
+        })
+
+        batch_updates.append({
+            "range": f"L{reserve_row_no}",
+            "values": [[status]]
+        })
+
+    if batch_updates:
+        sheet.batch_update(batch_updates)
+
 def restore_order(text, rows):
     text = expand_short_dates(text)
     if text.strip() in ["復原最後刪除", "還原最後刪除"]:
-        return restore_last_delete()
+        return restore_last_delete(rows)
     parts = text.split()
 
     if len(parts) < 2:
         return "❌ 復原格式錯誤"
 
     restored = 0
-
+    restore_rows = []
     # 復原單號
     if all(p.isdigit() for p in parts[1:]):
 
@@ -3458,7 +3520,7 @@ def restore_order(text, rows):
                 continue
 
             if r[0] in order_ids:
-
+                restore_rows.append(r)
                 sheet.update(
                     f"L{i}:O{i}",
                     [[
@@ -3470,7 +3532,11 @@ def restore_order(text, rows):
                 )
 
                 restored += 1
-
+        if restore_rows:
+            deduct_reserve_batch(
+                restore_rows,
+                rows
+            )
         return (
             f"✅ 已復原 {restored} 筆"
             if restored
@@ -3509,7 +3575,7 @@ def restore_order(text, rows):
 
             try:
                 if any(parse_date(r[2]) == parse_date(d) for d in dates):
-
+                    restore_rows.append(r)
                     sheet.update(
                         f"L{i}:O{i}",
                         [[
@@ -3523,6 +3589,11 @@ def restore_order(text, rows):
                     restored += 1
             except:
                 pass
+        if restore_rows:
+            deduct_reserve_batch(
+                restore_rows,
+                rows
+            )    
         return (
         f"✅ 已復原 {restored} 筆"
         if restored
@@ -3553,7 +3624,7 @@ def restore_order(text, rows):
 
         if product and r[4].strip() != product:
             continue
-
+        restore_rows.append(r)
         sheet.update(
             f"L{i}:O{i}",
             [[
@@ -3565,16 +3636,20 @@ def restore_order(text, rows):
         )
 
         restored += 1
-
+    if restore_rows:
+        deduct_reserve_batch(
+            restore_rows,
+            rows
+        )
     return (
         f"✅ 已復原 {restored} 筆"
         if restored
         else "❌ 找不到已刪除訂單"
     )
 
-def restore_last_delete():
+def restore_last_delete(rows):
 
-    rows = sheet.get_all_values()
+    
 
     deleted_rows = []
 
@@ -3609,10 +3684,12 @@ def restore_last_delete():
     )
 
     restored = 0
-
+    restore_rows = []
     for i, batch in deleted_rows:
 
         if batch == last_batch:
+
+            restore_rows.append(rows[i - 1])
 
             sheet.update(
                 f"L{i}:O{i}",
@@ -3625,7 +3702,11 @@ def restore_last_delete():
             )
 
             restored += 1
-
+    if restore_rows:
+        deduct_reserve_batch(
+            restore_rows,
+            rows
+        )
     return f"✅ 已復原最後一次刪除，共 {restored} 筆"
 
 def smart_parse(text: str):
