@@ -1606,19 +1606,13 @@ def schedule_order(text, rows, user_id):
         if remain <= 0:
     
             batch_updates.append({
-    
-                "range": f"F{row}:L{row}",
-    
-                "values": [[
-                    0,
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                    "已完成"
-                ]]
-    
+                "range": f"F{row}",
+                "values": [[0]]
+            })
+
+            batch_updates.append({
+                "range": f"L{row}",
+                "values": [["已完成"]]
             })
     
         # 還有剩餘
