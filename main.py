@@ -1281,6 +1281,127 @@ UNIT_WHITELIST = [
     "K","k"
 ]
 
+def restore_reservation(order):
+
+    rows = sheet.get_all_values()
+
+    for row_no, r in enumerate(rows[1:], start=2):
+
+        status = r[11] if len(r) > 11 else ""
+
+        # 找相同客戶商品的預約
+        if (
+            status == "預約"
+            and r[3] == order["customer"]
+            and r[4] == order["product"]
+        ):
+
+            try:
+                qty = float(r[5])
+            except:
+                qty = 0
+
+            qty += float(order["qty"])
+
+            sheet.update(
+                f"F{row_no}:L{row_no}",
+                [[
+                    qty,
+                    r[6],
+                    r[7],
+                    r[8],
+                    r[9],
+                    "",
+                    "預約"
+                ]]
+            )
+
+            return
+
+    # 找不到預約，就新增一筆
+    save_order({
+        "date": "未定",
+        "customer": order["customer"],
+        "product": order["product"],
+        "qty": order["qty"],
+        "unit": order["unit"],
+        "price": order["price"],
+        "delivery": order["delivery"],
+        "note": order["note"],
+        "status": "預約"
+    }, "")
+
+def deduct_reservation(order):
+
+    rows = sheet.get_all_values()
+
+    need_qty = float(order["qty"])
+
+    batch_updates = []
+
+    for row_no, r in enumerate(rows[1:], start=2):
+
+        status = r[11] if len(r) > 11 else ""
+
+        if status != "預約":
+            continue
+
+        if str(r[2]).strip() != "未定":
+            continue
+
+        if str(r[3]).strip() != order["customer"]:
+            continue
+
+        if str(r[4]).strip() != order["product"]:
+            continue
+
+        reserve_qty = float(r[5])
+
+        use_qty = min(need_qty, reserve_qty)
+
+        remain = reserve_qty - use_qty
+
+        if remain <= 0:
+
+            batch_updates.append({
+
+                "range": f"F{row_no}:L{row_no}",
+
+                "values": [[
+                    0,
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "已完成"
+                ]]
+
+            })
+
+        else:
+
+            batch_updates.append({
+
+                "range": f"F{row_no}",
+
+                "values": [[remain]]
+
+            })
+
+        need_qty -= use_qty
+
+        if need_qty <= 0:
+            break
+
+    if need_qty > 0:
+        raise Exception(
+            f"{order['customer']} {order['product']} 預約不足"
+        )
+
+    if batch_updates:
+        sheet.batch_update(batch_updates)
+
 def schedule_order(text, rows, user_id):
 
     text = normalize_symbols(text)
@@ -1680,6 +1801,8 @@ def edit_order(text, rows):
 
     batch_updates = []
 
+    new_orders = []
+
     for block in blocks:
 
         lines = [
@@ -1853,6 +1976,21 @@ def edit_order(text, rows):
 
             updates = matched_updates
 
+            status = r[11] if len(r) > 11 else ""
+
+            if status == "正常":
+
+                restore_reservation({
+
+                    "customer": r[3],
+                    "product": r[4],
+                    "qty": r[5],
+                    "unit": r[6],
+                    "price": r[7],
+                    "delivery": r[8],
+                    "note": r[9]
+
+                })
             # 日期條件
             if dates:
 
@@ -1887,7 +2025,21 @@ def edit_order(text, rows):
             if has_product_filter and "商品" not in updates:
                 if not any(p in sheet_product for p in product_filter):
                     continue
+            status = r[11] if len(r) > 11 else ""
 
+            if status == "正常":
+
+                restore_reservation({
+
+                    "customer": r[3],
+                    "product": r[4],
+                    "qty": r[5],
+                    "unit": r[6],
+                    "price": r[7],
+                    "delivery": r[8],
+                    "note": r[9]
+
+                })
             # =========================
             # 收集更新資料
             # =========================
@@ -1934,10 +2086,35 @@ def edit_order(text, rows):
                     "values": [[updates["備註"]]]
                 })
 
+            new_order = {
+
+                "customer": r[3],
+
+                "product": updates.get("商品", r[4]),
+
+                "qty": updates.get("數量", r[5]),
+
+                "unit": updates.get("單位", r[6]),
+
+                "price": updates.get("單價", r[7]),
+
+                "delivery": updates.get("配送", r[8]),
+
+                "note": updates.get("備註", r[9])
+
+            }
+
+            new_orders.append(new_order)
+
             updated_total += 1
 
     if batch_updates:
+
         sheet.batch_update(batch_updates)
+
+        for order in new_orders:
+
+            deduct_reservation(order)
 
     if updated_total == 0:
         return "❌ 找不到符合訂單"
@@ -3103,6 +3280,18 @@ def delete_order(text, user_id, rows):
             if product and r[4] != product:
                 continue
 
+            restore_reservation({
+
+                "customer": r[3],
+                "product": r[4],
+                "qty": r[5],
+                "unit": r[6],
+                "price": r[7],
+                "delivery": r[8],
+                "note": r[9]
+
+            })
+
             sheet.update(
                 f"L{i}:O{i}",
                 [[
@@ -3133,6 +3322,18 @@ def delete_order(text, user_id, rows):
 
             if r[0] not in order_ids:
                 continue
+
+            restore_reservation({
+
+                "customer": r[3],
+                "product": r[4],
+                "qty": r[5],
+                "unit": r[6],
+                "price": r[7],
+                "delivery": r[8],
+                "note": r[9]
+
+            })
 
             sheet.update(
                 f"L{i}:O{i}",
@@ -3206,6 +3407,18 @@ def delete_order(text, user_id, rows):
             try:
                 if any(parse_date(r[2]) == parse_date(d) for d in dates):
 
+                    restore_reservation({
+
+                        "customer": r[3],
+                        "product": r[4],
+                        "qty": r[5],
+                        "unit": r[6],
+                        "price": r[7],
+                        "delivery": r[8],
+                        "note": r[9]
+
+                    })
+                    
                     sheet.update(
                         f"L{i}:O{i}",
                         [[
@@ -3244,6 +3457,18 @@ def delete_order(text, user_id, rows):
         if products:
             if r[4] not in products:
                 continue
+
+        restore_reservation({
+
+            "customer": r[3],
+            "product": r[4],
+            "qty": r[5],
+            "unit": r[6],
+            "price": r[7],
+            "delivery": r[8],
+            "note": r[9]
+
+        })
 
         sheet.update(
             f"L{i}:O{i}",
