@@ -2201,7 +2201,7 @@ def save_orders_batch(
             order["price"],
             order["delivery"],
             order["note"],
-            creator,
+            user_id,
             order.get("status", "正常"),
             "",
             "",
