@@ -1726,24 +1726,36 @@ def edit_order(text, rows):
         if head and head[0] == "改單":
             head = head[1:]
 
-        dates = []
-        rest = []
+        # ===== 支援改單 單號 =====
+        order_ids = [x for x in head if x.isdigit()]
 
-        for t in head:
-            if re.match(f"^{DATE_PATTERN}$", t):
-                dates.append(t.strip())
-            else:
-                rest.append(t)
+        if order_ids:
 
-        customer = rest[0] if rest else ""
+            dates = []
+            customer = ""
+            product_filter = []
+            has_product_filter = False
 
-        product_filter = [
-            x.strip()
-            for x in rest[1:]
-            if x and not re.match(f"^{DATE_PATTERN}$", x)
-        ]
+        else:
 
-        has_product_filter = len(product_filter) > 0
+            dates = []
+            rest = []
+
+            for t in head:
+                if re.match(f"^{DATE_PATTERN}$", t):
+                    dates.append(t.strip())
+                else:
+                    rest.append(t)
+
+            customer = rest[0] if rest else ""
+
+            product_filter = [
+                x.strip()
+                for x in rest[1:]
+                if x and not re.match(f"^{DATE_PATTERN}$", x)
+            ]
+
+            has_product_filter = len(product_filter) > 0
 
         # =========================
         # 2️⃣ 修改內容解析
@@ -1848,6 +1860,11 @@ def edit_order(text, rows):
         # 3️⃣ 套用更新
         # =========================
         for row_no, r in enumerate(rows[1:], start=2):
+
+            # ===== 單號優先 =====
+            if order_ids:
+                if r[0] not in order_ids:
+                    continue
 
             sheet_date = str(r[2]).strip()
             try:
@@ -1961,7 +1978,7 @@ def edit_order(text, rows):
                 # ===== 商品改了 =====
                 if product_changed:
 
-                    ew_qty = float(updates.get("數量", old_qty))
+                    new_qty = float(updates.get("數量", old_qty))
 
                     new_reserve_row_no, new_reserve_row = find_available_reserve(
                         rows,
