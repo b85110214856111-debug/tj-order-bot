@@ -2205,9 +2205,10 @@ def save_order(data, user_id):
 
     seq_no = oid[-3:]
 
-    data["date"] = format_date(
-        parse_date(data["date"])
-    )
+    if str(data["date"]).strip() != "未定":
+        data["date"] = format_date(
+            parse_date(data["date"])
+        )
 
     sheet.append_row([
         oid,
