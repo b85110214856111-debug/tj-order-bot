@@ -391,25 +391,28 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
         # 日期區間（支援跨年）
         if start_date and end_date:
 
-            try:
+            # 預約(未定)一律保留
+            if str(r[2]).strip() != "未定":
 
-                order_date = parse_date(r[2])
+                try:
 
-                start_dt, end_dt = parse_date_range(
-                    start_date,
-                    end_date
-                )
+                    order_date = parse_date(r[2])
 
-                check = order_date
+                    start_dt, end_dt = parse_date_range(
+                        start_date,
+                        end_date
+                    )
 
-                if check < start_dt:
-                    check = check.replace(year=check.year + 1)
+                    check = order_date
 
-                if not (start_dt <= check <= end_dt):
+                    if check < start_dt:
+                        check = check.replace(year=check.year + 1)
+
+                    if not (start_dt <= check <= end_dt):
+                        continue
+
+                except:
                     continue
-
-            except:
-                continue
 
         # 關鍵字(客戶)
         if keyword != "全部":
