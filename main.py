@@ -2899,6 +2899,52 @@ def query_order(text, rows):
     text = expand_short_dates(text)
     keyword = text.replace("查詢", "").strip()
 
+    # ===== 查詢預約 =====
+    if keyword.startswith("預約"):
+
+        args = keyword.split()
+
+        customer = args[1] if len(args) >= 2 else ""
+        product = args[2] if len(args) >= 3 else ""
+
+        result = []
+
+        for r in rows[1:]:
+
+            status = r[11] if len(r) > 11 else ""
+
+            if status != "預約":
+                continue
+
+            if customer and customer not in r[3]:
+                continue
+
+            if product and product not in r[4]:
+                continue
+
+            result.append(r)
+
+        if not result:
+            return "❌ 找不到預約"
+
+        lines = []
+
+        for r in result[:50]:
+
+            qty = r[5] if len(r) > 5 else ""
+            unit = r[6] if len(r) > 6 else ""
+            price = r[7] if len(r) > 7 else ""
+            delivery = r[8] if len(r) > 8 else ""
+            note = r[9] if len(r) > 9 else ""
+
+            lines.append(
+                f"客戶:{r[3]} 商品:{r[4]} "
+                f"數量:{qty}{unit} 單價:{price} "
+                f"配送:{delivery} 備註:{note}"
+            )
+
+        return "\n".join(lines)
+    
     # 保留原本單一查詢
     keywords = keyword.split()
 
