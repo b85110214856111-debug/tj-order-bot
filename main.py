@@ -444,7 +444,7 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
         key=lambda r: (
             parse_date(r[2])
             if str(r[2]).strip() != "未定"
-            else datetime.max,
+            else date.max,
             r[3],
             r[4]
         )
