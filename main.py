@@ -1693,10 +1693,22 @@ def edit_order(text, rows):
 
     for line in lines:
 
-        # 遇到新的「改單」開始新區塊
-        if line.startswith("改單") and current:
+        # 第一個改單
+        if line.startswith("改單"):
+            if current:
+                blocks.append("\n".join(current))
+            current = [line]
+            continue
+
+        # 新的單號開始
+        if (
+            current
+            and line.isdigit()
+            and len(line) >= 8
+        ):
             blocks.append("\n".join(current))
-            current = []
+            current = ["改單 " + line]
+            continue
 
         current.append(line)
 
