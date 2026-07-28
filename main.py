@@ -1878,14 +1878,15 @@ def edit_order(text, rows):
                 if r[0] not in order_ids:
                     continue
 
-            sheet_date = str(r[2]).strip()
-            try:
+                sheet_date_obj = None
 
-                sheet_date_obj = parse_date(sheet_date)
+            else:
+                sheet_date = str(r[2]).strip()
 
-            except:
-
-                continue
+                try:
+                    sheet_date_obj = parse_date(sheet_date)
+                except:
+                    continue
             sheet_customer = str(r[3]).strip()
             sheet_product = str(r[4]).strip()
 
@@ -1913,15 +1914,16 @@ def edit_order(text, rows):
             old_qty = float(r[5]) if str(r[5]).strip() else 0
             old_product = str(r[4]).strip()
 
+            # L欄：訂單狀態
             status = str(r[11]).strip() if len(r) > 11 else ""
 
-            # 預約單不用找來源預約
-            if status == "預約":
-                reserve_row_no = None
-                reserve_row = None
-            else:
+            # 正式訂單才需要找來源預約
+            if status != "預約":
                 reserve_uuid = str(r[17]).strip() if len(r) > 17 else ""
                 reserve_row_no, reserve_row = find_reserve_row(rows, reserve_uuid)
+            else:
+                reserve_row_no = None
+                reserve_row = None
 
             new_product = updates.get("商品", old_product)
             product_changed = (new_product != old_product)
