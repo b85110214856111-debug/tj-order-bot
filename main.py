@@ -1914,16 +1914,10 @@ def edit_order(text, rows):
             old_qty = float(r[5]) if str(r[5]).strip() else 0
             old_product = str(r[4]).strip()
 
-            # L欄：訂單狀態
-            status = str(r[11]).strip() if len(r) > 11 else ""
+            # R欄：來源預約UUID
+            reserve_uuid = str(r[17]).strip() if len(r) > 17 else ""
 
-            # 正式訂單才需要找來源預約
-            if status != "預約":
-                reserve_uuid = str(r[17]).strip() if len(r) > 17 else ""
-                reserve_row_no, reserve_row = find_reserve_row(rows, reserve_uuid)
-            else:
-                reserve_row_no = None
-                reserve_row = None
+            reserve_row_no, reserve_row = find_reserve_row(rows, reserve_uuid)
 
             new_product = updates.get("商品", old_product)
             product_changed = (new_product != old_product)
