@@ -1676,6 +1676,22 @@ def find_available_reserve(rows, customer, product):
 
     return None, None
 
+def safe_qty(value):
+
+    text = str(value).strip()
+
+    if not text:
+        return 0
+
+    if text == "全出":
+        return 0
+
+    try:
+        return float(text)
+
+    except (ValueError, TypeError):
+        return 0
+
 def edit_order(text, rows):
     text = expand_short_dates(text)
     
@@ -1839,17 +1855,32 @@ def edit_order(text, rows):
 
                     v = token[1:].strip()
 
+                    # 支援「× 全出」
                     if not v and i + 1 < len(parts):
                         i += 1
-                        v = parts[i]
+                        v = parts[i].strip()
 
-                    m = re.match(r"(\d+(?:\.\d+)?)(.*)", v)
+                    # ===== 全出 =====
+                    if v == "全出":
 
-                    if m:
-                        updates["數量"] = m.group(1)
+                        updates["數量"] = "全出"
 
-                        if m.group(2):
-                            updates["單位"] = parse_unit(m.group(2))
+                    # ===== 一般數量 =====
+                    else:
+
+                        m = re.match(
+                            r"(\d+(?:\.\d+)?)(.*)",
+                            v
+                        )
+
+                        if m:
+
+                            updates["數量"] = m.group(1)
+
+                            if m.group(2):
+                                updates["單位"] = parse_unit(
+                                    m.group(2)
+                                )
 
                 # ===== 配送 =====
                 elif token.startswith("+"):
@@ -1994,14 +2025,14 @@ def edit_order(text, rows):
                 # 商品沒改，才扣回同一筆預約
                 if not product_changed:
 
-                    new_qty = float(updates.get("數量", old_qty))
+                    new_qty = safe_qty(updates.get("數量", old_qty))
 
                     reserve_qty -= new_qty
 
                 # ===== 商品改了 =====
                 if product_changed:
 
-                    new_qty = float(updates.get("數量", old_qty))
+                    new_qty = safe_qty(updates.get("數量", old_qty))
 
                     new_reserve_row_no, new_reserve_row = find_available_reserve(
                         rows,
