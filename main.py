@@ -1911,7 +1911,17 @@ def edit_order(text, rows):
             updates = matched_updates
 
             # ===== 原始訂單資料 =====
-            old_qty = float(r[5]) if str(r[5]).strip() else 0
+            # ===== 原始訂單數量 =====
+            old_qty_text = str(r[5]).strip()
+
+            # 「全出」不是數字，改單時先保留原文字
+            if old_qty_text == "全出":
+                old_qty = 0
+            else:
+                try:
+                    old_qty = float(old_qty_text) if old_qty_text else 0
+                except (ValueError, TypeError):
+                    old_qty = 0
             old_product = str(r[4]).strip()
 
             # R欄：來源預約UUID
