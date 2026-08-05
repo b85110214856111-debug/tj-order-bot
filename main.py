@@ -3917,6 +3917,19 @@ async def callback(request: Request):
                 + text[start + length:]
             )
 
+        # ===== 移除 LINE Mention 後，重新整理文字 =====
+
+        # 移除標記後，刪除空白行，避免大量標記留下多餘換行
+        text = "\n".join(
+            line.strip()
+            for line in text.splitlines()
+            if line.strip()
+        )
+
+        # 將同一行內連續的空白或 Tab 合併成一個空白
+        text = re.sub(r"[ \t]+", " ", text)
+
+        # 最後再移除整段文字前後空白
         text = text.strip()
 
         # ===== 追加下單 =====
