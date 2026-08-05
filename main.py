@@ -3307,8 +3307,16 @@ def delete_order(text, user_id, rows):
 
         customer = others[0] if others else ""
 
-        # 第二行開始都是商品
-        products = lines[1:]
+        # 第二行開始原本是商品
+        # 但如果整行都是 @標記，忽略該行
+        products = [
+            line
+            for line in lines[1:]
+            if not re.fullmatch(
+                r"(?:@\S+\s*)+",
+                line
+            )
+        ]
 
     else:
 
@@ -3917,19 +3925,6 @@ async def callback(request: Request):
                 + text[start + length:]
             )
 
-        # ===== 移除 LINE Mention 後，重新整理文字 =====
-
-        # 移除標記後，刪除空白行，避免大量標記留下多餘換行
-        text = "\n".join(
-            line.strip()
-            for line in text.splitlines()
-            if line.strip()
-        )
-
-        # 將同一行內連續的空白或 Tab 合併成一個空白
-        text = re.sub(r"[ \t]+", " ", text)
-
-        # 最後再移除整段文字前後空白
         text = text.strip()
 
         # ===== 追加下單 =====
