@@ -670,6 +670,21 @@ def export_orders(rows, keyword="全部", start_date=None, end_date=None):
 
     return url
 
+def _app_order_creator_name(line_user_id, fallback_name):
+    """Use the linked App profile name so Google Sheets can import LINE orders."""
+    try:
+        links = _line_app_supabase_request("GET", "line_order_links", params={
+            "select": "profile_id", "line_user_id": f"eq.{line_user_id}"})
+        if len(links) != 1:
+            return fallback_name
+        profiles = _line_app_supabase_request("GET", "profiles", params={
+            "select": "name", "id": f"eq.{links[0]['profile_id']}"})
+        if len(profiles) == 1 and str(profiles[0].get("name") or "").strip():
+            return str(profiles[0]["name"]).strip()
+    except Exception as exc:
+        print(f"App 建立人名稱查詢略過：{exc}")
+    return fallback_name
+
 def get_user_name(user_id):
 
     try:
@@ -4044,7 +4059,7 @@ async def callback(request: Request):
                 continue
 
         user_id = event["source"]["userId"]
-        user_name = get_user_name(user_id)
+        user_name = _app_order_creator_name(user_id, get_user_name(user_id))
 
         # ===== 收到照片 =====
         if msg_type == "image":
@@ -4106,7 +4121,7 @@ async def callback(request: Request):
     # ============================
 
         user_id = event["source"]["userId"]
-        user_name = get_user_name(user_id)
+        user_name = _app_order_creator_name(user_id, get_user_name(user_id))
         text = text.replace("周", "週")
         if (
             (
