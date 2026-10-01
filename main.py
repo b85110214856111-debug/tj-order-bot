@@ -2,6 +2,10 @@
 # LINE + FastAPI + Google Sheets 訂單系統（商用整合版）
 import cmd
 import os
+import base64
+import hmac
+import json
+import hashlib
 import re
 import token
 import requests
@@ -23,8 +27,114 @@ BASE_URL = os.getenv(
 )
 LINE_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
 SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "")
 
 line_bot_api = LineBotApi(LINE_TOKEN)
+
+
+
+def _verify_line_webhook_signature(raw_body, signature):
+    if not LINE_CHANNEL_SECRET or not signature:
+        return False
+    digest = hmac.new(LINE_CHANNEL_SECRET.encode("utf-8"), raw_body, hashlib.sha256).digest()
+    expected = base64.b64encode(digest).decode("ascii")
+    return hmac.compare_digest(expected, signature)
+
+def _line_app_supabase_request(method, table, params=None, payload=None, prefer=None):
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        raise RuntimeError("LINE App 綁定尚未設定伺服器連線")
+    headers = {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+        "Content-Type": "application/json",
+    }
+    if prefer:
+        headers["Prefer"] = prefer
+    result = requests.request(method, f"{SUPABASE_URL}/rest/v1/{table}", params=params,
+        json=payload, headers=headers, timeout=12)
+    if not result.ok:
+        raise RuntimeError(f"Supabase {table} 回應 HTTP {result.status_code}")
+    return result.json() if result.content else []
+
+
+def _record_line_group_member(source):
+    if source.get("type") != "group" or not source.get("groupId") or not source.get("userId"):
+        return
+    try:
+        _line_app_supabase_request("POST", "line_order_group_members",
+            params={"on_conflict": "line_group_id,line_user_id"},
+            payload={"line_group_id": source["groupId"], "line_user_id": source["userId"],
+                "last_seen_at": datetime.now(timezone.utc).isoformat()},
+            prefer="resolution=merge-duplicates,return=minimal")
+    except Exception as exc:
+        print(f"LINE 群組成員紀錄略過：{exc}")
+
+
+def _line_app_link_or_group_command(event, text):
+    source = event.get("source") or {}
+    line_user_id = source.get("userId")
+    reply_token = event.get("replyToken")
+    if not line_user_id or not reply_token:
+        return False
+    compact = re.sub(r"[\s。！!]", "", text)
+    is_group_command = compact in ("綁定訂單通知群組", "設定訂單通知群組")
+    is_link_code = re.fullmatch(r"[A-Fa-f0-9]{12}", compact) is not None
+    if not is_group_command and not is_link_code:
+        return False
+    try:
+        if is_link_code:
+            code_hash = hashlib.sha256(compact.upper().encode("utf-8")).hexdigest()
+            codes = _line_app_supabase_request("GET", "line_order_link_codes", params={
+                "select": "profile_id", "code_hash": f"eq.{code_hash}",
+                "expires_at": f"gt.{datetime.now(timezone.utc).isoformat()}"})
+            if not codes:
+                reply = "LINE 綁定碼無效或已過期，請回 App 重新產生綁定碼。"
+            else:
+                _line_app_supabase_request("POST", "line_order_links",
+                    params={"on_conflict": "line_user_id"},
+                    payload={"line_user_id": line_user_id, "profile_id": codes[0]["profile_id"],
+                        "created_at": datetime.now(timezone.utc).isoformat()},
+                    prefer="resolution=merge-duplicates,return=minimal")
+                _line_app_supabase_request("DELETE", "line_order_link_codes",
+                    params={"code_hash": f"eq.{code_hash}"})
+                reply = "LINE 已成功連結到你的業務系統帳號。"
+        else:
+            group_id = source.get("groupId") if source.get("type") == "group" else None
+            if not group_id:
+                reply = "請在要接收訂單通知的 LINE 群組內傳送「綁定訂單通知群組」。"
+            else:
+                links = _line_app_supabase_request("GET", "line_order_links",
+                    params={"select": "profile_id", "line_user_id": f"eq.{line_user_id}"})
+                if not links:
+                    reply = "請先在 App 綁定 LINE 帳號，再由主管在群組內傳送此設定指令。"
+                else:
+                    profiles = _line_app_supabase_request("GET", "profiles", params={
+                        "select": "id,name,role,group_name", "id": f"eq.{links[0]['profile_id']}"})
+                    if not profiles:
+                        reply = "找不到對應的 App 使用者，請聯絡系統管理員。"
+                    else:
+                        profile = profiles[0]
+                        role = str(profile.get("role") or "").strip().lower()
+                        if role not in ("主管", "管理員", "manager", "admin", "administrator", "supervisor"):
+                            reply = "只有主管或管理員可以設定訂單通知群組。"
+                        elif not str(profile.get("group_name") or "").strip():
+                            reply = "目前 App 帳號沒有設定群組名稱，請先聯絡系統管理員設定。"
+                        else:
+                            _line_app_supabase_request("POST", "line_order_groups",
+                                params={"on_conflict": "group_name"},
+                                payload={"group_name": profile["group_name"], "line_group_id": group_id,
+                                    "bound_by_profile_id": profile["id"],
+                                    "updated_at": datetime.now(timezone.utc).isoformat()},
+                                prefer="resolution=merge-duplicates,return=minimal")
+                            reply = f"已將此群組設定為「{profile['group_name']}」的訂單通知群組。"
+    except Exception as exc:
+        print(f"LINE App 綁定處理失敗：{exc}")
+        reply = "LINE App 綁定處理失敗，請確認 Supabase 設定與群組通知 SQL 已完成。"
+    line_bot_api.reply_message(reply_token, TextSendMessage(text=reply))
+    return True
+
 
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -3910,7 +4020,11 @@ def files():
 
 @app.post("/callback")
 async def callback(request: Request):
-    body = await request.json()
+    raw_body = await request.body()
+    signature = request.headers.get("X-Line-Signature", "")
+    if not _verify_line_webhook_signature(raw_body, signature):
+        return PlainTextResponse("Invalid LINE signature", status_code=401)
+    body = json.loads(raw_body)
 
     rows = sheet.get_all_values()
     customer_rows = customer_sheet.get_all_values()
@@ -3922,6 +4036,12 @@ async def callback(request: Request):
             continue
 
         msg_type = event["message"]["type"]
+
+        _record_line_group_member(event.get("source") or {})
+        if msg_type == "text":
+            incoming_text = str(event["message"].get("text") or "").strip()
+            if _line_app_link_or_group_command(event, incoming_text):
+                continue
 
         user_id = event["source"]["userId"]
         user_name = get_user_name(user_id)
