@@ -1,4 +1,4 @@
-﻿# main.py
+# main.py
 # LINE + FastAPI + Google Sheets 訂單系統（商用整合版）
 import cmd
 import os
@@ -2355,9 +2355,12 @@ def save_order(data, user_id):
 
     return oid
 
-def _line_mention_display_name(line_user_id):
+def _line_mention_display_name(line_user_id, line_group_id=None):
     try:
-        profile = line_bot_api.get_profile(line_user_id)
+        if line_group_id:
+            profile = line_bot_api.get_group_member_profile(line_group_id, line_user_id)
+        else:
+            profile = line_bot_api.get_profile(line_user_id)
         return str(profile.display_name or "").strip() or "LINE成員"
     except Exception as exc:
         print(f"LINE 標註名稱查詢略過：{exc}")
@@ -2423,7 +2426,7 @@ def _sheet_line_recipient_columns(line_group_id=None):
             sheet.batch_update(updates)
 
     try:
-        sheet.hide_columns(id_column)
+        sheet.hide_columns(id_column - 1, id_column)
     except Exception as exc:
         print(f"隱藏 LINE 通知對象 ID 欄略過：{exc}")
     return name_column, id_column
