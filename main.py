@@ -2355,27 +2355,90 @@ def save_order(data, user_id):
 
     return oid
 
-def _sheet_line_recipient_column():
-    header = "LINE通知對象"
-    headers = sheet.row_values(1)
-    if header in headers:
-        return headers.index(header) + 1
-    column = len(headers) + 1
-    if column > sheet.col_count:
-        sheet.add_cols(column - sheet.col_count)
-    sheet.update_cell(1, column, header)
-    return column
+def _line_mention_display_name(line_user_id):
+    try:
+        profile = line_bot_api.get_profile(line_user_id)
+        return str(profile.display_name or "").strip() or "LINE成員"
+    except Exception as exc:
+        print(f"LINE 標註名稱查詢略過：{exc}")
+        return "LINE成員"
 
+
+def _sheet_column_letter(column):
+    result = ""
+    while column:
+        column, remainder = divmod(column - 1, 26)
+        result = chr(65 + remainder) + result
+    return result
+
+
+def _sheet_line_recipient_columns(line_group_id=None):
+    name_header = "LINE通知對象"
+    id_header = "LINE通知對象ID"
+    headers = sheet.row_values(1)
+    migrate_legacy_ids = False
+
+    if id_header in headers:
+        id_column = headers.index(id_header) + 1
+    elif name_header in headers:
+        id_column = headers.index(name_header) + 1
+        sheet.update_cell(1, id_column, id_header)
+        headers[id_column - 1] = id_header
+        migrate_legacy_ids = True
+    else:
+        id_column = len(headers) + 1
+        if id_column > sheet.col_count:
+            sheet.add_cols(id_column - sheet.col_count)
+        sheet.update_cell(1, id_column, id_header)
+
+    if name_header in headers:
+        name_column = headers.index(name_header) + 1
+    else:
+        name_column = len(headers) + 1
+        if name_column > sheet.col_count:
+            sheet.add_cols(name_column - sheet.col_count)
+        sheet.update_cell(1, name_column, name_header)
+
+    if migrate_legacy_ids:
+        old_ids = sheet.col_values(id_column)[1:]
+        old_names = sheet.col_values(name_column)[1:]
+        name_letter = _sheet_column_letter(name_column)
+        name_cache = {}
+        updates = []
+        for row_number, raw_ids in enumerate(old_ids, start=2):
+            if not str(raw_ids or "").strip():
+                continue
+            current_name = old_names[row_number - 2] if row_number - 2 < len(old_names) else ""
+            if str(current_name or "").strip():
+                continue
+            ids = [value.strip() for value in re.split(r"[，,;\s]+", str(raw_ids)) if value.strip()]
+            display_names = []
+            for line_id in ids:
+                if line_id not in name_cache:
+                    name_cache[line_id] = _line_mention_display_name(line_id, line_group_id)
+                display_names.append(name_cache[line_id])
+            if display_names:
+                updates.append({"range": f"{name_letter}{row_number}", "values": [["、".join(display_names)]]})
+        if updates:
+            sheet.batch_update(updates)
+
+    try:
+        sheet.hide_columns(id_column)
+    except Exception as exc:
+        print(f"隱藏 LINE 通知對象 ID 欄略過：{exc}")
+    return name_column, id_column
 
 def save_orders_batch(
     orders,
     user_id,
-    notification_line_user_ids=None
+    notification_line_user_ids=None,
+    line_group_id=None
 ):
 
     rows = []
-    recipient_column = _sheet_line_recipient_column()
+    recipient_name_column, recipient_id_column = _sheet_line_recipient_columns(line_group_id)
     notification_ids = sorted({str(value).strip() for value in (notification_line_user_ids or []) if str(value).strip()})
+    notification_names = [_line_mention_display_name(line_id, line_group_id) for line_id in notification_ids]
 
     now_str = now_tw().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -2415,9 +2478,11 @@ def save_orders_batch(
             seq_no,                 # Q
             order.get("reserve_uuid", "")   # R
         ]
-        if recipient_column > len(row):
-            row.extend([""] * (recipient_column - len(row)))
-        row[recipient_column - 1] = ",".join(notification_ids)
+        required_columns = max(recipient_name_column, recipient_id_column)
+        if required_columns > len(row):
+            row.extend([""] * (required_columns - len(row)))
+        row[recipient_name_column - 1] = "、".join(notification_names)
+        row[recipient_id_column - 1] = ",".join(notification_ids)
         rows.append(row)
 
     sheet.append_rows(rows)
@@ -4275,7 +4340,8 @@ async def callback(request: Request):
                     count = save_orders_batch(
                         orders,
                         user_name,
-                                mentioned_line_user_ids
+                                mentioned_line_user_ids,
+                                (event.get("source") or {}).get("groupId")
                     )
 
                     results.append(
@@ -4390,7 +4456,8 @@ async def callback(request: Request):
                             count = save_orders_batch(
                                 orders,
                                 user_name,
-                                mentioned_line_user_ids
+                                mentioned_line_user_ids,
+                                (event.get("source") or {}).get("groupId")
                             )
 
     # 舊格式：日期 客戶
@@ -4402,7 +4469,8 @@ async def callback(request: Request):
                             count = save_orders_batch(
                                 orders,
                                 user_name,
-                                mentioned_line_user_ids
+                                mentioned_line_user_ids,
+                                (event.get("source") or {}).get("groupId")
                             )
 
     # 每行都是完整訂單
@@ -4423,7 +4491,8 @@ async def callback(request: Request):
                             count = save_orders_batch(
                                 orders,
                                 user_name,
-                                mentioned_line_user_ids
+                                mentioned_line_user_ids,
+                                (event.get("source") or {}).get("groupId")
                             )
 
 # ===== 單行 =====
@@ -4442,7 +4511,8 @@ async def callback(request: Request):
                         count = save_orders_batch(
                             orders,
                             user_name,
-                                mentioned_line_user_ids
+                                mentioned_line_user_ids,
+                                (event.get("source") or {}).get("groupId")
                         )
                 
 
