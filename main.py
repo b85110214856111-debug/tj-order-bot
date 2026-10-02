@@ -1,4 +1,4 @@
-# main.py
+﻿# main.py
 # LINE + FastAPI + Google Sheets 訂單系統（商用整合版）
 import cmd
 import os
@@ -2355,12 +2355,27 @@ def save_order(data, user_id):
 
     return oid
 
+def _sheet_line_recipient_column():
+    header = "LINE通知對象"
+    headers = sheet.row_values(1)
+    if header in headers:
+        return headers.index(header) + 1
+    column = len(headers) + 1
+    if column > sheet.col_count:
+        sheet.add_cols(column - sheet.col_count)
+    sheet.update_cell(1, column, header)
+    return column
+
+
 def save_orders_batch(
     orders,
-    user_id
+    user_id,
+    notification_line_user_ids=None
 ):
 
     rows = []
+    recipient_column = _sheet_line_recipient_column()
+    notification_ids = sorted({str(value).strip() for value in (notification_line_user_ids or []) if str(value).strip()})
 
     now_str = now_tw().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -2380,7 +2395,7 @@ def save_orders_batch(
 
         seq_no = oid[-3:]
 
-        rows.append([
+        row = [
             oid,
             now_str,
             order["date"],
@@ -2399,7 +2414,11 @@ def save_orders_batch(
             str(uuid.uuid4()),      # P
             seq_no,                 # Q
             order.get("reserve_uuid", "")   # R
-        ])
+        ]
+        if recipient_column > len(row):
+            row.extend([""] * (recipient_column - len(row)))
+        row[recipient_column - 1] = ",".join(notification_ids)
+        rows.append(row)
 
     sheet.append_rows(rows)
 
@@ -4091,6 +4110,12 @@ async def callback(request: Request):
                 []
             )
 
+        mentioned_line_user_ids = sorted({
+            str(mention.get("userId")).strip()
+            for mention in mentionees
+            if mention.get("type") == "user" and mention.get("userId")
+        })
+
         for m in reversed(mentionees):
 
             start = m["index"]
@@ -4249,7 +4274,8 @@ async def callback(request: Request):
 
                     count = save_orders_batch(
                         orders,
-                        user_name
+                        user_name,
+                                mentioned_line_user_ids
                     )
 
                     results.append(
@@ -4363,7 +4389,8 @@ async def callback(request: Request):
                         if orders:
                             count = save_orders_batch(
                                 orders,
-                                user_name
+                                user_name,
+                                mentioned_line_user_ids
                             )
 
     # 舊格式：日期 客戶
@@ -4374,7 +4401,8 @@ async def callback(request: Request):
                         if orders:
                             count = save_orders_batch(
                                 orders,
-                                user_name
+                                user_name,
+                                mentioned_line_user_ids
                             )
 
     # 每行都是完整訂單
@@ -4394,7 +4422,8 @@ async def callback(request: Request):
                         if orders:
                             count = save_orders_batch(
                                 orders,
-                                user_name
+                                user_name,
+                                mentioned_line_user_ids
                             )
 
 # ===== 單行 =====
@@ -4412,7 +4441,8 @@ async def callback(request: Request):
                     if orders:
                         count = save_orders_batch(
                             orders,
-                            user_name
+                            user_name,
+                                mentioned_line_user_ids
                         )
                 
 
